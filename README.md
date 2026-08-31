@@ -23,13 +23,13 @@ Or a release binary, checked against the attestation GitHub's own workflow produ
 against a checksum from the same release, which whoever replaced the binary could replace too:
 
 ```sh
-gh release download v0.5.0 -R owfeed/owfeed -p 'owfeed-linux-amd64'
+gh release download v0.5.1 -R owfeed/owfeed -p 'owfeed-linux-amd64'
 gh attestation verify owfeed-linux-amd64 -R owfeed/owfeed \
   --signer-workflow owfeed/owfeed/.github/workflows/release.yml
 chmod +x owfeed-linux-amd64 && sudo mv owfeed-linux-amd64 /usr/local/bin/owfeed
 ```
 
-In GitHub Actions, `owfeed/owfeed/setup@v0.5.0` does that verification for you. Builds exist for
+In GitHub Actions, `owfeed/owfeed/setup@v0.5.1` does that verification for you. Builds exist for
 linux and darwin, amd64 and arm64.
 
 **What it needs.** Nothing for `build`, `sign`, `index` or `publish`: the apk toolchain is fetched
@@ -210,9 +210,9 @@ jobs:
       pages: write
       id-token: write
       actions: read
-    uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.0
+    uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.1
     with:
-      owfeed-version: v0.5.0
+      owfeed-version: v0.5.1
       smoke-releases: "25.12 24.10"
     secrets:
       sign-key: ${{ secrets.OWFEED_SIGN_KEY }}
@@ -231,8 +231,8 @@ The `environment:` on the publish job is still what gates the run behind a revie
 If you want the steps yourself, take the tool and leave the shape:
 
 ```yaml
-- uses: owfeed/owfeed/setup@v0.5.0
-  with: { version: v0.5.0 }
+- uses: owfeed/owfeed/setup@v0.5.1
+  with: { version: v0.5.1 }
 - run: owfeed --frozen-lock build && owfeed sign && owfeed index
   env:
     OWFEED_SIGN_KEY: ${{ secrets.OWFEED_SIGN_KEY }}

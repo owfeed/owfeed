@@ -43,10 +43,10 @@ name: owfeed feed
 #         pages: write
 #         id-token: write
 #         actions: read
-#       uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.0
+#       uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.1
 #       secrets: inherit        # so the publish job can read the environment's key
 #       with:
-#         owfeed-version: v0.5.0
+#         owfeed-version: v0.5.1
 #         pre-build: for d in packages/*/; do ./tools/fetch.sh "$d"; done
 #         post-index: ./tools/check-tree.sh
 #         smoke-releases: "25.12 24.10"
@@ -60,9 +60,9 @@ name: owfeed feed
 #         pages: write          # granting less than any of its jobs declares fails
 #         id-token: write       # at startup rather than skipping that job. The
 #         actions: read         # check job narrows itself back to contents: read,
-#       uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.0   # so nothing that
+#       uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.1   # so nothing that
 #       with:                                                     # runs holds it.
-#         owfeed-version: v0.5.0
+#         owfeed-version: v0.5.1
 #         dry-run: true         # throwaway keys, no environment, nothing published
 #         pre-build: for d in packages/*/; do ./tools/fetch.sh "$d"; done
 #         post-index: ./tools/check-tree.sh
@@ -174,7 +174,7 @@ jobs:
       SOURCE_DATE_EPOCH: ${{ inputs.source-date-epoch }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: owfeed/owfeed/setup@v0.5.0
+      - uses: owfeed/owfeed/setup@v0.5.1
         with:
           version: ${{ inputs.owfeed-version }}
 
@@ -218,7 +218,7 @@ jobs:
       SOURCE_DATE_EPOCH: ${{ inputs.source-date-epoch }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: owfeed/owfeed/setup@v0.5.0
+      - uses: owfeed/owfeed/setup@v0.5.1
         with:
           version: ${{ inputs.owfeed-version }}
 
@@ -317,7 +317,7 @@ jobs:
       OWFEED_USIGN_KEY: ${{ secrets.OWFEED_USIGN_KEY || secrets.usign-key }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: owfeed/owfeed/setup@v0.5.0
+      - uses: owfeed/owfeed/setup@v0.5.1
         with:
           version: ${{ inputs.owfeed-version }}
 

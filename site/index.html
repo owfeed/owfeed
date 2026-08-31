@@ -85,12 +85,12 @@ go install owfeed.org/owfeed/cmd/owfeed@latest</pre>
 
 <p>Or download a release binary and check it against the attestation GitHub produced for it:</p>
 
-<pre>gh release download v0.5.0 -R owfeed/owfeed -p 'owfeed-linux-amd64'
+<pre>gh release download v0.5.1 -R owfeed/owfeed -p 'owfeed-linux-amd64'
 gh attestation verify owfeed-linux-amd64 -R owfeed/owfeed \
   --signer-workflow owfeed/owfeed/.github/workflows/release.yml
 chmod +x owfeed-linux-amd64 &amp;&amp; sudo mv owfeed-linux-amd64 /usr/local/bin/owfeed</pre>
 
-<p>In GitHub Actions, <code>owfeed/owfeed/setup@v0.5.0</code> and
+<p>In GitHub Actions, <code>owfeed/owfeed/setup@v0.5.1</code> and
 <code>owfeed/owlab/setup@v0.5.1</code> do that check for you.</p>
 
 <h3>What you need</h3>

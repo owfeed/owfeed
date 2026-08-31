@@ -2,6 +2,20 @@
 
 Dates are when the tag was cut. Anything not listed is documentation or tests.
 
+## v0.5.1 — 2026-08-31
+
+- **Added:** `install-if` on a package. apk installs such a package by itself once every
+  entry is satisfied, which is the one thing `depends` cannot express: a translation
+  catalogue depends on its application, so installing or upgrading the APPLICATION pulls
+  in no catalogue, and a router that had the language quietly loses it on the upgrade
+  that splits catalogues out. Measured on luci-theme-footstrap 0.14.3 -> 0.14.4 — every
+  `.lmo` left with the old package and nothing named the new one. apk wants at least two
+  entries with one pinned by `=`; write that pin `{version}` and it expands to the version
+  being built, so a release does not hand-edit it. OpenWrt's buildroot never passes this
+  field to `mkpkg`, so a feed built here can express something an in-tree package cannot.
+  opkg has no conditional equivalent — `Recommends:` is executed but unconditional — which
+  `docs/examples.md` says rather than leaving the asymmetry to be discovered.
+
 ## v0.5.0 — 2026-07-30
 
 The author's side of the ecosystem gets the shape the feed's side has had since
