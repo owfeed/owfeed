@@ -180,6 +180,21 @@ const (
 // mkpkgArgs assembles the command line. Every path in it is relative to the staging
 // directory: apk may be running in a container where absolute host paths do not
 // exist, and the staging directory is the one thing mounted there.
+// installIf renders the install-if entries, expanding {version} to the version this
+// build is producing.
+//
+// The placeholder is what makes the field usable at all: apk requires one entry pinned
+// with `=`, and a feed whose packages share a version — the ordinary case, and the one
+// this exists for, a translation pinned to its application — would otherwise have to
+// hand-edit that pin on every release, in a file no gate reads.
+func installIf(p config.Package, version string) string {
+	out := make([]string, 0, len(p.InstallIf))
+	for _, e := range p.InstallIf {
+		out = append(out, strings.ReplaceAll(e, "{version}", version))
+	}
+	return strings.Join(out, " ")
+}
+
 func mkpkgArgs(stage string, req Request, arch string) ([]string, error) {
 	p := req.Package
 	name := p.EffectiveName()
@@ -215,6 +230,7 @@ func mkpkgArgs(stage string, req Request, arch string) ([]string, error) {
 		{"provides", strings.Join(provides(p), " ")},
 		{"replaces", strings.Join(p.Replaces, " ")},
 		{"recommends", strings.Join(p.Recommends, " ")},
+		{"install-if", installIf(p, req.Version)},
 	}
 	if p.ABIVersion != "" {
 		// The suffix lives on the name, and ImageBuilder's GetABISuffix reads it back

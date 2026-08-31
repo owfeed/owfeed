@@ -142,6 +142,39 @@ packages, and a router upgrading from that release still owns `footstrap.ru.lmo`
 is a file conflict, and apk refuses the upgrade — the one it was supposed to deliver. If your
 package never shipped a `luci-i18n-*` variant, the default is fine.
 
+**`install-if`, when the translations are their own packages.** Splitting catalogues out the way
+`luci.mk` does — one `luci-i18n-<app>-<lang>` each — leaves a gap nothing else in this file closes:
+`depends` points from the catalogue to the application, so installing or upgrading the APPLICATION
+pulls in no catalogue at all. A router that had the language then upgrades and quietly loses it,
+which is what happened to footstrap between 0.14.3 and 0.14.4.
+
+apk has a field for exactly this, and owfeed passes it through:
+
+```yaml
+  - name: luci-i18n-footstrap-ru
+    build: mkpkg
+    arch: noarch
+    version-from: file:./dist/VERSION
+    files: ./dist/i18n-ru
+    depends: [luci-theme-footstrap]
+    install-if: [ "luci-theme-footstrap={version}", "luci-i18n-base-ru" ]
+```
+
+Read it as "install this by yourself once the theme is at that version AND this router is already
+Russian". apk wants at least two entries with one pinned by `=` (apk-package(5)); `{version}`
+expands to the version being built, so a release never hand-edits the pin, and because the pin moves
+the rule re-fires on every upgrade of the application.
+
+The trigger is a package, not a setting: a package manager cannot read `uci luci.main.lang`, so
+`luci-i18n-base-<lang>` — the LuCI base catalogue a translated router already carries — is what
+"this router speaks that language" looks like from here.
+
+**opkg has no conditional form of this.** `Recommends:` is parsed and acted on by OpenWrt's opkg,
+but it is unconditional: it would put Russian on every 24.10 router. A postinst cannot install the
+package either, opkg holding an exclusive lock for the whole run. So the ipk leg of a split-out
+translation needs an installer script or a documented package name, and the apk leg carries the
+behaviour on its own. That asymmetry is the format's, not owfeed's.
+
 ### 3. Build the feed
 
 ```sh

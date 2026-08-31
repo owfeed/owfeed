@@ -184,6 +184,40 @@ func TestIntegrationBuildRejectsBadVersion(t *testing.T) {
 // never passes it to mkpkg — so a package whose Makefile declares a conflict does
 // not enforce it on 25.12. A package that conflicts with others that all
 // rewrite the routing table, is the case that makes this matter.
+// A catalogue has to install itself: `depends` points from it to its application, so
+// installing the application pulls in nothing, and apk's install-if is the only field
+// that says "install me once both of these are true". The pin is written {version} in
+// the manifest and must reach the package expanded, or apk refuses the field outright
+// (it wants at least two entries with one `=`).
+func TestIntegrationInstallIfCarriesTheExpandedPin(t *testing.T) {
+	tool := testapk.Require(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	out := t.TempDir()
+	req := request(stageFixture(t), out)
+	req.Package.InstallIf = []string{"luci-theme-footstrap={version}", "luci-i18n-base-ru"}
+
+	res, err := build.Build(ctx, tool, req)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	dump, err := tool.RunOK(ctx, apk.Invocation{Workdir: filepath.Dir(res.File), Args: []string{"adbdump", filepath.Base(res.File)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"install-if", "luci-theme-footstrap=" + req.Version, "luci-i18n-base-ru"} {
+		if !strings.Contains(dump.Stdout, want) {
+			t.Errorf("install-if does not carry %s:\n%s", want, dump.Stdout)
+		}
+	}
+	if strings.Contains(dump.Stdout, "{version}") {
+		t.Errorf("the placeholder reached the package unexpanded:\n%s", dump.Stdout)
+	}
+}
+
 func TestIntegrationConflictsBecomeNegativeDependencies(t *testing.T) {
 	tool := testapk.Require(t)
 

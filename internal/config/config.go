@@ -276,6 +276,26 @@ type Package struct {
 	Replaces   []string `yaml:"replaces"`
 	Recommends []string `yaml:"recommends"`
 
+	// InstallIf makes apk install this package BY ITSELF once every entry here is
+	// satisfied — the mechanism a translation package needs and the one thing
+	// `depends` cannot express: a catalogue depends on its application, so installing
+	// the application never pulls the catalogue in, and a user upgrading a theme
+	// silently loses the language they had (measured on luci-theme-footstrap 0.14.3 ->
+	// 0.14.4: the catalogues left with the old package and nothing named the new one).
+	//
+	// apk requires at least two entries, one of them pinned with `=`, which is also
+	// what makes it re-fire on every upgrade of the pinned package:
+	//
+	//     install-if: [ "luci-theme-footstrap={version}", "luci-i18n-base-ru" ]
+	//
+	// {version} expands to the version this build is producing, so a release does not
+	// hand-edit the pin in a file no gate reads.
+	//
+	// opkg has no conditional equivalent. `Recommends:` is executed by OpenWrt's opkg
+	// but is unconditional, so the ipk leg of a package using this simply does not get
+	// the behaviour; that is a property of the format, not of this field.
+	InstallIf []string `yaml:"install-if"`
+
 	// Conflicts are packages that must not be installed alongside this one. apk
 	// spells a conflict as a negative dependency, so these become !name entries in
 	// depends.
