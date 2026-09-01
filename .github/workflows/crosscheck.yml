@@ -53,7 +53,7 @@ jobs:
       # repository is not a package project and has none; and `manager` -- the
       # apk/opkg verdict, which is half of what is being compared -- was not in the
       # JSON at all.
-      - uses: owfeed/owlab/setup@v0.5.1
+      - uses: owfeed/owlab/setup@v0.5.3
         with:
           version: v0.5.1
 
