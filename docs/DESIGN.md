@@ -33,11 +33,12 @@ A single static Go binary that turns a directory into a signed feed. Stateless, 
 directories.
 
 ```
-sources ──build──►  out/<release>/<arch>/*.apk        ← no key in this process
+sources ──build──►  dist/<arch>/*.apk                 ← no key in this process
                           │
                        sign            per-package signature       ← key here
                           │
-                      index            packages.adb + index.json + sha256sums
+                      index            out/releases/<release>/<arch>/:
+                                       packages.adb + index.json + sha256sums
                           │
                      publish           packages first, index last
                           │

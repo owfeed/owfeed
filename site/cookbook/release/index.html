@@ -169,7 +169,16 @@ tag, as above, or use a separate job with an <code>environment:</code>.</div>
 
 <h2>Check it before anyone else does</h2>
 
-<pre>owfeed doctor --require-origin</pre>
+<pre>owfeed check</pre>
+
+<p><code>owfeed check</code> builds, signs, indexes and runs <code>doctor --require-origin</code>
+on an EC key and a usign key it generates for the run and throws away, in a temporary directory it
+removes afterwards. Run it on every pull request: it needs no <code>signing:</code> block and no
+secret, so a fork's code never runs beside a real key.</p>
+
+<p>Run <code>owfeed doctor</code> on its own only when you have an indexed tree — it reads
+<code>out/</code> and stops with <em>run <code>owfeed index</code> first</em> otherwise, which a
+repository that publishes releases rather than a feed never produces.</p>
 
 <p>Numbered findings, each saying what it costs and what to do. The ones that catch most first
 attempts:</p>

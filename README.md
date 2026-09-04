@@ -380,6 +380,16 @@ owfeed --frozen-lock build
 owfeed release --repo "$GITHUB_REPOSITORY" --tag "$GITHUB_REF_NAME"
 ```
 
+Before any of that runs, `owfeed plan` says what the build would produce — the version, the
+architectures, and the path of every file — offline and without producing it. `--json` is versioned,
+so a later job can read it instead of globbing `dist/`. It answers earliest for
+`version-from: tag`, which takes the version from the tag being built (`tag:v` strips the `v`)
+rather than from a file the build script has not written yet.
+
+```sh
+owfeed plan
+```
+
 On a pull request there is no tag and there must be no key — a signing secret in the job that runs
 a fork's code is a secret the fork can aim work at. One command covers everything that can be
 checked without one:
