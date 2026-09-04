@@ -105,10 +105,12 @@ writes a report to stdout.</p>
 <tr><td><code>owfeed init</code></td><td>Scaffold <code>owfeed.yml</code> in this directory.</td></tr>
 <tr><td><code>owfeed keygen</code></td><td>Create the feed's signing key. <code>--usign</code> makes a release-manifest key instead.</td></tr>
 <tr><td><code>owfeed lock</code></td><td>Derive the architecture matrix into <code>owfeed.lock</code>. <code>--update</code> prints the diff.</td></tr>
+<tr><td><code>owfeed plan</code></td><td>What a build would produce, offline and before it produces it: version, architectures, and the path of every file. <code>--json</code> for a later job to read.</td></tr>
 <tr><td><code>owfeed build</code></td><td>Package every configured package into <code>dist/&lt;arch&gt;/</code>. Does not compile.</td></tr>
 <tr><td><code>owfeed sign</code></td><td>Add a signature inside each package.</td></tr>
 <tr><td><code>owfeed index</code></td><td>Fan the packages out per architecture and write a signed index in each.</td></tr>
 <tr><td><code>owfeed doctor</code></td><td>Check the built tree. <code>--require-origin</code> demands every package name its source repository; <code>--author-keys DIR</code> demands every package carry a signature by a key pinned in DIR.</td></tr>
+<tr><td><code>owfeed check</code></td><td>Build, sign, index and <code>doctor</code> on keys generated for the run and discarded. Needs no <code>signing:</code> block and leaves nothing behind — what a pull request can verify with no secret in scope.</td></tr>
 <tr><td><code>owfeed smoke</code></td><td>Install the built feed on a real OpenWrt image. <code>--release 24.10</code> for the older line.</td></tr>
 <tr><td><code>owfeed verify</code></td><td>Check the published feed from outside, over its documented URL.</td></tr>
 <tr><td><code>owfeed publish</code></td><td>Gate the tree on those checks and hand it to the target. No override flag.</td></tr>
@@ -188,7 +190,7 @@ packages:
   - name: luci-app-mine
     build: mkpkg              # package a staged directory; owfeed does not compile
     arch: noarch              # never "all" — apk rejects it
-    version: 1.0.0-r1         # or version-from: makefile:./Makefile
+    version: 1.0.0-r1         # or version-from: tag:v, makefile:./Makefile, file:./VERSION
     files: ./staging/luci-app-mine
     conffiles: ["/etc/config/mine"]
     depends: ["luci-base"]

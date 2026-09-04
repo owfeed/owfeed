@@ -105,10 +105,12 @@
 <tr><td><code>owfeed init</code></td><td>Создать заготовку <code>owfeed.yml</code> в текущем каталоге.</td></tr>
 <tr><td><code>owfeed keygen</code></td><td>Сделать ключ подписи фида. С <code>--usign</code> — ключ для манифестов релиза.</td></tr>
 <tr><td><code>owfeed lock</code></td><td>Вывести матрицу архитектур в <code>owfeed.lock</code>. <code>--update</code> печатает разницу.</td></tr>
+<tr><td><code>owfeed plan</code></td><td>Что даст сборка — версия, архитектуры и путь каждого файла — офлайн и до того, как она это сделает. <code>--json</code> — чтобы прочитал следующий job.</td></tr>
 <tr><td><code>owfeed build</code></td><td>Упаковать все пакеты из конфига в <code>dist/&lt;arch&gt;/</code>. Не компилирует.</td></tr>
 <tr><td><code>owfeed sign</code></td><td>Положить подпись внутрь каждого пакета.</td></tr>
 <tr><td><code>owfeed index</code></td><td>Разложить пакеты по архитектурам и написать в каждой подписанный индекс.</td></tr>
 <tr><td><code>owfeed doctor</code></td><td>Проверить собранное дерево. <code>--require-origin</code> требует, чтобы каждый пакет называл свой репозиторий; <code>--author-keys DIR</code> — чтобы каждый нёс подпись ключом, зафиксированным в DIR.</td></tr>
+<tr><td><code>owfeed check</code></td><td>Сборка, подпись, индекс и <code>doctor</code> на ключах, созданных на время запуска и выброшенных. Не требует блока <code>signing:</code> и ничего не оставляет за собой — всё, что пулл-реквест может проверить, не имея секретов.</td></tr>
 <tr><td><code>owfeed smoke</code></td><td>Поставить собранный фид на живой образ OpenWrt. <code>--release 24.10</code> для старой линии.</td></tr>
 <tr><td><code>owfeed verify</code></td><td>Проверить опубликованный фид снаружи, по его же документированному URL.</td></tr>
 <tr><td><code>owfeed publish</code></td><td>Пропустить дерево через проверки и отдать цели публикации. Флага «всё равно опубликовать» нет.</td></tr>
@@ -186,7 +188,7 @@ packages:
   - name: luci-app-mine
     build: mkpkg              # упаковать разложенный каталог; owfeed не компилирует
     arch: noarch              # никогда не "all" — apk его отвергает
-    version: 1.0.0-r1         # либо version-from: makefile:./Makefile
+    version: 1.0.0-r1         # либо version-from: tag:v, makefile:./Makefile, file:./VERSION
     files: ./staging/luci-app-mine
     conffiles: ["/etc/config/mine"]
     depends: ["luci-base"]

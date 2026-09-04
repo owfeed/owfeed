@@ -242,8 +242,14 @@ type Package struct {
 
 	// Version is a literal version, mutually exclusive with VersionFrom.
 	Version string `yaml:"version"`
-	// VersionFrom reads the version from somewhere: "makefile:PATH", "file:PATH",
-	// or "git-describe".
+	// VersionFrom reads the version from somewhere: "tag", "makefile:PATH" or
+	// "file:PATH". "tag" takes the tag being built, with an optional prefix to strip
+	// written after a colon -- "tag:v" turns v3.4.0 into 3.4.0 -- and is the only
+	// source `owfeed plan` can resolve before anything is staged.
+	//
+	// "git-describe" is recognised and refused rather than accepted: `git describe`
+	// produces v1.2.3-4-gabcdef, which apk cannot parse, and every mapping onto apk's
+	// grammar decides on the author's behalf which of two builds is newer.
 	VersionFrom string `yaml:"version-from"`
 
 	// Releases are the release lines this package is published to. Empty means all
