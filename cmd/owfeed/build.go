@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -138,9 +137,9 @@ func (a *app) tool(ctx context.Context, l *lock.Lock) (*apk.Tool, error) {
 	if a.noNetwork {
 		a.debugf("using the cached toolchain for %s", release)
 	}
-	sdkDir, err := apk.Acquire(ctx, http.DefaultClient, a.cacheRoot, release)
+	sdkDir, err := apk.Acquire(ctx, upstreamHTTP, a.cacheRoot, release)
 	if err != nil {
-		return nil, wrap(exitUpstream, err)
+		return nil, wrapUpstream(err)
 	}
 	t, err := apk.Resolve(ctx, apk.Options{SDKDir: sdkDir, AllowContainer: true})
 	if err != nil {

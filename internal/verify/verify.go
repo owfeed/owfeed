@@ -25,6 +25,7 @@ import (
 
 	"owfeed.org/owfeed/internal/config"
 	"owfeed.org/owfeed/internal/feedindex"
+	"owfeed.org/owfeed/internal/netx"
 )
 
 // Options configure a run.
@@ -83,6 +84,9 @@ func (r *Report) add(f Finding) { r.Findings = append(r.Findings, f) }
 // redirect is the finding rather than something to follow.
 func client() *http.Client {
 	return &http.Client{
+		// Retries a 5xx or a dropped connection before a live-feed check gives up,
+		// so a CDN hiccup on the feed's host is not reported as the feed broken.
+		Transport:     &netx.Transport{},
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
 }
@@ -277,7 +281,7 @@ func liveIndex(ctx context.Context, hc *http.Client, repo, format string) ([]ind
 		return nil, err
 	}
 	if status != http.StatusOK {
-		return nil, fmt.Errorf("GET %s/index.json: %d", repo, status)
+		return nil, &netx.StatusError{URL: repo + "/index.json", Code: status, Status: strconv.Itoa(status)}
 	}
 	var doc struct {
 		Packages []indexEntry `json:"packages"`
@@ -297,7 +301,7 @@ func liveIndexIPK(ctx context.Context, hc *http.Client, repo string) ([]indexEnt
 		return nil, err
 	}
 	if status != http.StatusOK {
-		return nil, fmt.Errorf("GET %s/Packages: %d", repo, status)
+		return nil, &netx.StatusError{URL: repo + "/Packages", Code: status, Status: strconv.Itoa(status)}
 	}
 
 	var out []indexEntry

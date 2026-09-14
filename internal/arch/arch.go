@@ -21,6 +21,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"owfeed.org/owfeed/internal/netx"
 )
 
 // DownloadsBase is OpenWrt's release server. Mirrors are not used for derivation:
@@ -85,7 +87,7 @@ func Derive(ctx context.Context, hc *http.Client, cacheRoot, point string) (*Res
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GET %s: %s", url, resp.Status)
+		return nil, netx.Status(url, resp)
 	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
@@ -163,7 +165,7 @@ func Versions(ctx context.Context, hc *http.Client) ([]string, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GET %s: %s", VersionsURL, resp.Status)
+		return nil, netx.Status(VersionsURL, resp)
 	}
 
 	var versions struct {

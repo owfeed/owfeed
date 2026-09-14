@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"flag"
-	"net/http"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -159,17 +159,17 @@ func (a *app) signingTool(ctx context.Context, c *config.Config, override string
 		}
 	}
 	if release == "" {
-		point, err := arch.LatestPoint(ctx, http.DefaultClient, config.DefaultReleaseLine)
+		point, err := arch.LatestPoint(ctx, upstreamHTTP, config.DefaultReleaseLine)
 		if err != nil {
-			return nil, fail(exitUpstream, "%v\n  name one with --sdk-release", err)
+			return nil, wrapUpstream(fmt.Errorf("%w\n  name one with --sdk-release", err))
 		}
 		a.debugf("no lockfile: taking the apk tool from %s", point)
 		release = point
 	}
 
-	sdkDir, err := apk.Acquire(ctx, http.DefaultClient, a.cacheRoot, release)
+	sdkDir, err := apk.Acquire(ctx, upstreamHTTP, a.cacheRoot, release)
 	if err != nil {
-		return nil, wrap(exitUpstream, err)
+		return nil, wrapUpstream(err)
 	}
 	t, err := apk.Resolve(ctx, apk.Options{SDKDir: sdkDir, AllowContainer: true})
 	if err != nil {
