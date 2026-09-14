@@ -10,10 +10,15 @@ description: Install a verified owfeed binary and put it on PATH.
 inputs:
   version:
     description: >-
-      Release tag to install, such as v0.1.3, or "latest". Pin a tag: "latest"
-      means the tool that signs your feed can change under you between runs.
+      Release tag to install, such as v0.1.3, or "latest". Leave it unset to
+      install the release this action is pinned at: `setup@v0.5.3` installs
+      v0.5.3. "latest" means the tool that signs your feed can change under you
+      between runs.
     required: false
-    default: latest
+    # Empty, not "latest". With "latest" as the default, `uses:
+    # owfeed/owfeed/setup@v0.5.2` and no `version:` looked pinned and installed
+    # whatever was newest -- and the `uses:` ref is the only pin dependabot moves.
+    default: ""
   verify:
     description: >-
       Verify the download against its build attestation. Turning this off means
@@ -41,8 +46,30 @@ runs:
         GH_TOKEN: ${{ inputs.token }}
         OWFEED_VERSION: ${{ inputs.version }}
         OWFEED_VERIFY: ${{ inputs.verify }}
+        # The expression, not the GITHUB_ACTION_REF variable: measured on
+        # 2026-09-14 (in owfeed/owlab, whose setup is the same shape), that
+        # variable is empty inside a composite action's steps while
+        # github.action_ref holds the ref from `uses:`.
+        OWFEED_ACTION_REF: ${{ github.action_ref }}
       run: |
         set -euo pipefail
+
+        # No version asked for: install the release this action is pinned at, so
+        # `setup@v0.5.3` means owfeed 0.5.3 the way it reads. Only a release-shaped
+        # tag is taken; a branch, a SHA or a local `./setup` has no release of that
+        # name and keeps the old answer, with the warning further down.
+        if [ -z "$OWFEED_VERSION" ]; then
+          case "$OWFEED_ACTION_REF" in
+            v[0-9]*.[0-9]*.[0-9]*)
+              OWFEED_VERSION="$OWFEED_ACTION_REF"
+              echo "installing owfeed $OWFEED_VERSION, the release this action is pinned at"
+              ;;
+            *)
+              echo "::warning::this action was called at \"${OWFEED_ACTION_REF:-a local path}\", which is not a release tag; installing the latest release"
+              OWFEED_VERSION=latest
+              ;;
+          esac
+        fi
 
         case "$RUNNER_OS" in
           Linux)  os=linux ;;

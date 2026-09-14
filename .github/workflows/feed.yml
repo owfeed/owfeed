@@ -75,12 +75,13 @@ on:
           workflow is pinned at; set it only to run a different one.
         required: false
         type: string
-        # The workflow's own tag, moved with the setup@ lines by RELEASING.md step 1.
-        # It used to be required, which made a caller pin two things that have to
-        # agree — and dependabot moves the `uses: .../feed.yml@vX` ref without seeing
-        # this input. owfeed-packages ran feed.yml@v0.5.1 with an owfeed v0.4.5
-        # binary that way, every job green. A default makes the pin one line again.
-        default: v0.5.2
+        # Empty: the setup@ steps below then install the release they are pinned at,
+        # which RELEASING.md moves with this workflow's own tag. It used to be
+        # required, which made a caller pin two things that have to agree -- and
+        # dependabot moves the `uses: .../feed.yml@vX` ref without seeing this input.
+        # owfeed-packages ran feed.yml@v0.5.1 with an owfeed v0.4.5 binary that way,
+        # every job green.
+        default: ""
       dry-run:
         description: >-
           Run the whole pipeline against throwaway keys and stop before publishing.

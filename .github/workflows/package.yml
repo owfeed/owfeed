@@ -72,10 +72,9 @@ on:
           workflow is pinned at; set it only to run a different one.
         required: false
         type: string
-        # The workflow's own tag, moved with the setup@ lines by RELEASING.md step 1.
-        # Not required, for the reason on the same input in feed.yml: a required
-        # version is a second pin dependabot cannot see.
-        default: v0.5.2
+        # Empty, for the reason on the same input in feed.yml: the setup@ step below
+        # installs the release it is pinned at.
+        default: ""
       sign-also:
         description: >-
           Extra files to sign with the release key, space separated, resolved inside

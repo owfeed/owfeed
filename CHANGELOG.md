@@ -2,6 +2,19 @@
 
 Dates are when the tag was cut. Anything not listed is documentation or tests.
 
+## Unreleased
+
+- **Fixed:** `owfeed/owfeed/setup@vX.Y.Z` with no `version:` installs owfeed vX.Y.Z.
+  The default was `latest`, so a step that looked pinned installed whatever was newest,
+  and a dependabot bump of the `uses:` line moved nothing. An unset `version` now
+  resolves to the action's own ref, read from `${{ github.action_ref }}` — the
+  `GITHUB_ACTION_REF` variable is empty inside a composite action's steps, measured.
+  A branch, a SHA or a local `./setup` still installs the latest release, with a
+  warning. An explicit `version:` wins as before.
+- **Changed:** `owfeed-version` in `feed.yml` and `package.yml` defaults to empty, so
+  their `setup@` steps install the release the workflow is tagged with and RELEASING.md
+  has one pin fewer to move.
+
 ## v0.5.2 — 2026-09-14
 
 - **Changed:** `owfeed-version` is optional in `feed.yml` and `package.yml`, and defaults

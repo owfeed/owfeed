@@ -232,8 +232,7 @@ environment, поэтому с `secrets: inherit` читает их напрям
 Если шаги нужны свои — берите инструмент, оставьте форму:
 
 ```yaml
-- uses: owfeed/owfeed/setup@v0.5.2
-  with: { version: v0.5.2 }
+- uses: owfeed/owfeed/setup@v0.5.2       # ставит owfeed v0.5.2
 - run: owfeed --frozen-lock build && owfeed sign && owfeed index
   env:
     OWFEED_SIGN_KEY: ${{ secrets.OWFEED_SIGN_KEY }}

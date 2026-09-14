@@ -234,8 +234,7 @@ repository scope.
 If you want the steps yourself, take the tool and leave the shape:
 
 ```yaml
-- uses: owfeed/owfeed/setup@v0.5.2
-  with: { version: v0.5.2 }
+- uses: owfeed/owfeed/setup@v0.5.2       # installs owfeed v0.5.2
 - run: owfeed --frozen-lock build && owfeed sign && owfeed index
   env:
     OWFEED_SIGN_KEY: ${{ secrets.OWFEED_SIGN_KEY }}
