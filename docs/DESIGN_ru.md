@@ -204,8 +204,8 @@ build:
     release: latest-point        # или "25.12.2"; НИКОГДА не SNAPSHOT
   changed-only: true
 packages:
-  - path: net/https-dns-proxy                       # (a) компилируемый, SDK, все арки
-  - path: applications/luci-app-https-dns-proxy     # (b) SDK, arch:all → сборка 1 раз + fanout
+  - path: net/example-daemon                        # (a) компилируемый, SDK, все арки
+  - path: applications/luci-app-example             # (b) SDK, arch:all → сборка 1 раз + fanout
   - name: luci-theme-footstrap                      # (c) SDK-less: mkpkg, ~2 сек
     build: mkpkg
     arch: noarch                                    # НИКОГДА не "all"
