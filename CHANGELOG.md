@@ -2,7 +2,7 @@
 
 Dates are when the tag was cut. Anything not listed is documentation or tests.
 
-## Unreleased
+## v0.5.4 — 2026-09-14
 
 - **Fixed:** exit 8 means an upstream outage and nothing else. A 404 for a pinned SDK
   release, a `sha256sums` signature that does not verify or a listing that does not parse
