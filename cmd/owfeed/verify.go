@@ -55,8 +55,9 @@ func (a *app) verify(ctx context.Context, args []string) error {
 	})
 	if err != nil {
 		// A check that cannot run counts as failed. This one reaches the network, so
-		// an unreachable feed is exit 8 and retryable, unlike a finding.
-		return wrap(exitUpstream, err)
+		// an unreachable feed is exit 8 and retryable, unlike a finding -- and an
+		// index that answers but does not parse is a finding, exit 7.
+		return wrapUpstream(err)
 	}
 
 	for _, f := range report.Findings {

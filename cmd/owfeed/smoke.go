@@ -78,7 +78,9 @@ func (a *app) smoke(ctx context.Context, args []string) error {
 		Image:        *image,
 	})
 	if err != nil {
-		return wrap(exitCheck, err)
+		// 7 for everything the router said, 8 only when Docker Hub would not hand
+		// over the image: nothing about the feed was tried then.
+		return wrapUpstream(err)
 	}
 
 	a.logf("installed %d package(s) from %s on %s", len(res.Installed), res.Arch, res.Image)

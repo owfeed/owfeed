@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"net/http"
 	"path/filepath"
 
 	"owfeed.org/owfeed/internal/arch"
@@ -70,10 +69,15 @@ func (a *app) derive(ctx context.Context, c *config.Config) (*lock.Lock, error) 
 		if a.noNetwork {
 			res, err = arch.Cached(a.cacheRoot, point)
 		} else {
-			res, err = arch.Derive(ctx, http.DefaultClient, a.cacheRoot, point)
+			res, err = arch.Derive(ctx, upstreamHTTP, a.cacheRoot, point)
 		}
 		if err != nil {
-			return nil, wrap(exitUpstream, err)
+			// No cached answer under --no-network stays 8, as it was: it is not a
+			// finding about upstream, and a run with the network may well succeed.
+			if a.noNetwork {
+				return nil, wrap(exitUpstream, err)
+			}
+			return nil, wrapUpstream(err)
 		}
 
 		l.Releases = append(l.Releases, lock.Release{
@@ -149,9 +153,9 @@ func (a *app) pointFor(ctx context.Context, c *config.Config, r config.Release) 
 		return "", fail(exitUpstream, "build.sdk.release is %q and --no-network was given; "+
 			"pin a concrete point release, or run without --no-network", config.LatestPoint)
 	}
-	point, err := arch.LatestPoint(ctx, http.DefaultClient, r.Line)
+	point, err := arch.LatestPoint(ctx, upstreamHTTP, r.Line)
 	if err != nil {
-		return "", wrap(exitUpstream, err)
+		return "", wrapUpstream(err)
 	}
 	return point, nil
 }

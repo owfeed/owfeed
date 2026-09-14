@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -44,9 +43,9 @@ func (a *app) releases(ctx context.Context, args []string) error {
 			"there is no cached answer to give under --no-network")
 	}
 
-	published, err := arch.Versions(ctx, http.DefaultClient)
+	published, err := arch.Versions(ctx, upstreamHTTP)
 	if err != nil {
-		return wrap(exitUpstream, err)
+		return wrapUpstream(err)
 	}
 
 	want := []string(lines)

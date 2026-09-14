@@ -2,6 +2,24 @@
 
 Dates are when the tag was cut. Anything not listed is documentation or tests.
 
+## Unreleased
+
+- **Fixed:** exit 8 means an upstream outage and nothing else. A 404 for a pinned SDK
+  release, a `sha256sums` signature that does not verify or a listing that does not parse
+  used to exit 8 too, so CI following the contract retried an answer that could not
+  change. They now exit 7. A 5xx, 429, timeout, DNS failure or refused connection is still
+  8, and its message says it was an outage.
+- **Fixed:** requests to downloads.openwrt.org and to the feed checked by `owfeed verify`
+  are retried on a 5xx, 429 or dropped connection: 4 attempts, 2, 4 and 8 s apart.
+  Before, one 502 from a mirror ended the command.
+- **Fixed:** `owfeed smoke` pulls the router image before running it. A Docker Hub
+  outage exits 8 after 3 pulls instead of exit 7 "the feed did not install"; a missing
+  tag is still 7. An image already present is used without asking the registry.
+- **Fixed:** `owfeed/owfeed/setup` retries `gh release download` and `gh release view`
+  while GitHub answers 5xx or cannot be reached, and exits 8 when that outlasts 4
+  attempts. When `gh attestation verify` cannot reach GitHub or Sigstore, it retries
+  and reports an outage (exit 8) rather than "does not verify".
+
 ## v0.5.3 — 2026-09-14
 
 - **Fixed:** `owfeed/owfeed/setup@vX.Y.Z` with no `version:` installs owfeed vX.Y.Z.

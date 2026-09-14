@@ -16,6 +16,7 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 
+	"owfeed.org/owfeed/internal/netx"
 	"owfeed.org/owfeed/internal/usign"
 )
 
@@ -180,7 +181,7 @@ func downloadAndExtract(ctx context.Context, hc *http.Client, url, wantHash, des
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("GET %s: %s", url, resp.Status)
+		return netx.Status(url, resp)
 	}
 
 	hasher := sha256.New()
@@ -280,7 +281,7 @@ func fetch(ctx context.Context, hc *http.Client, url string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GET %s: %s", url, resp.Status)
+		return nil, netx.Status(url, resp)
 	}
 	return io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 }

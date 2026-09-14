@@ -23,9 +23,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"owfeed.org/owfeed/internal/config"
 	"owfeed.org/owfeed/internal/feedindex"
+	"owfeed.org/owfeed/internal/netx"
 )
 
 // DefaultArch is the architecture smoked. It is x86_64 because that is the one
@@ -112,6 +114,13 @@ func Run(ctx context.Context, opts Options) (*Result, error) {
 	if opts.Format == "ipk" {
 		body = scriptOpkg(opts.FeedName, opts.Release, opts.LayoutPath, arch, opts.UsignKeyID, pkgs)
 	}
+	// Pulled first and on its own, so that Docker Hub not answering is reported as
+	// that. Left to `docker run`, a registry 503 came back as "the feed did not
+	// install", exit 7, with no package ever tried.
+	if err := ensureImage(ctx, image); err != nil {
+		return nil, err
+	}
+
 	cmd := exec.CommandContext(ctx, "docker", "run", "--rm",
 		"--platform", "linux/amd64",
 		"-v", abs+":/feed:ro",
@@ -175,6 +184,67 @@ func ResolveImage(ctx context.Context, line, point string) (string, error) {
 }
 
 func imageRef(point string) string { return "openwrt/rootfs:x86-64-" + point }
+
+// Three pulls, 5 s and 10 s apart. Variables so tests need not wait.
+var (
+	pullAttempts = 3
+	pullDelay    = 5 * time.Second
+)
+
+// ensureImage makes sure the linux/amd64 image is present, pulling it when it is not.
+//
+// A copy already present is used without asking the registry, as `docker run` would:
+// `docker pull` checks the digest even then, and during a Hub outage that would fail
+// a run that needs nothing from the Hub.
+func ensureImage(ctx context.Context, image string) error {
+	have, err := exec.CommandContext(ctx, "docker", "image", "inspect",
+		"--format", "{{.Os}}/{{.Architecture}}", image).Output()
+	if err == nil && strings.TrimSpace(string(have)) == "linux/amd64" {
+		return nil
+	}
+
+	delay := pullDelay
+	var out []byte
+	for attempt := 1; ; attempt++ {
+		out, err = exec.CommandContext(ctx, "docker", "pull", "--platform", "linux/amd64", image).CombinedOutput()
+		if err == nil {
+			return nil
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if !pullOutage(string(out)) {
+			// `manifest unknown`, `pull access denied`: the registry answered.
+			return fmt.Errorf("docker pull %s: %w\n%s", image, err, out)
+		}
+		if attempt >= pullAttempts {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(delay):
+		}
+		delay *= 2
+	}
+	return netx.Outage(fmt.Errorf("docker pull %s failed %d times and the registry is not answering "+
+		"(an upstream outage, not a finding about the feed; safe to run again later): %w\n%s",
+		image, pullAttempts, err, out))
+}
+
+// pullOutageRE matches what `docker pull` prints when the registry, or the way to it,
+// is failing. Measured with Docker 29.4.0: an unresolvable registry printed
+// `Get "https://nonexistent.invalid/v2/": Bad Gateway` (Docker Desktop's proxy), a
+// refused one `dial tcp 127.0.0.1:1: connect: connection refused`. A missing tag
+// printed `manifest unknown`, and a missing repository `pull access denied ...
+// repository does not exist` -- answers, and deliberately not matched. The rest are
+// the registry's own 429 and 5xx texts and Go's transport errors.
+var pullOutageRE = regexp.MustCompile(`(?i)toomanyrequests|too many requests|bad gateway|` +
+	`service unavailable|gateway time-?out|internal server error|i/o timeout|` +
+	`tls handshake timeout|connection reset|connection refused|no such host|unexpected eof|` +
+	`request canceled|context deadline exceeded|server misbehaving`)
+
+func pullOutage(out string) bool { return pullOutageRE.MatchString(out) }
 
 // pointTagRE matches a final point release, so release candidates are not picked
 // up: an -rc image is a router nobody is running.

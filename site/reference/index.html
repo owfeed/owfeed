@@ -229,8 +229,8 @@ different codes.</p>
 <tr><td>4</td><td>Key problem</td></tr>
 <tr><td>5</td><td>Index failed</td></tr>
 <tr><td>6</td><td>Publish failed</td></tr>
-<tr><td>7</td><td>A check failed — do not retry</td></tr>
-<tr><td>8</td><td>Upstream unreachable — safe to retry</td></tr>
+<tr><td>7</td><td>A check failed — do not retry. Includes an answer from upstream that a retry cannot change: a 404 for a pinned release, a signature or checksum that does not match, a missing image tag</td></tr>
+<tr><td>8</td><td>Upstream outage — safe to retry. A 5xx, 429, timeout, DNS failure or refused connection that lasted through owfeed's own retries</td></tr>
 <tr><td>9</td><td><code>owfeed.lock</code> disagrees with upstream</td></tr>
 </table>
 
