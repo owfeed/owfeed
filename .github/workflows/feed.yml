@@ -43,10 +43,9 @@ name: owfeed feed
 #         pages: write
 #         id-token: write
 #         actions: read
-#       uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.1
+#       uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.2
 #       secrets: inherit        # so the publish job can read the environment's key
 #       with:
-#         owfeed-version: v0.5.1
 #         pre-build: for d in packages/*/; do ./tools/fetch.sh "$d"; done
 #         post-index: ./tools/check-tree.sh
 #         smoke-releases: "25.12 24.10"
@@ -60,9 +59,8 @@ name: owfeed feed
 #         pages: write          # granting less than any of its jobs declares fails
 #         id-token: write       # at startup rather than skipping that job. The
 #         actions: read         # check job narrows itself back to contents: read,
-#       uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.1   # so nothing that
+#       uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.2   # so nothing that
 #       with:                                                     # runs holds it.
-#         owfeed-version: v0.5.1
 #         dry-run: true         # throwaway keys, no environment, nothing published
 #         pre-build: for d in packages/*/; do ./tools/fetch.sh "$d"; done
 #         post-index: ./tools/check-tree.sh
@@ -72,9 +70,17 @@ on:
   workflow_call:
     inputs:
       owfeed-version:
-        description: owfeed release tag to install. Pin it.
-        required: true
+        description: >-
+          owfeed release tag to install. Leave it unset to run the release this
+          workflow is pinned at; set it only to run a different one.
+        required: false
         type: string
+        # The workflow's own tag, moved with the setup@ lines by RELEASING.md step 1.
+        # It used to be required, which made a caller pin two things that have to
+        # agree — and dependabot moves the `uses: .../feed.yml@vX` ref without seeing
+        # this input. owfeed-packages ran feed.yml@v0.5.1 with an owfeed v0.4.5
+        # binary that way, every job green. A default makes the pin one line again.
+        default: v0.5.2
       dry-run:
         description: >-
           Run the whole pipeline against throwaway keys and stop before publishing.
@@ -174,7 +180,7 @@ jobs:
       SOURCE_DATE_EPOCH: ${{ inputs.source-date-epoch }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: owfeed/owfeed/setup@v0.5.1
+      - uses: owfeed/owfeed/setup@v0.5.2
         with:
           version: ${{ inputs.owfeed-version }}
 
@@ -218,7 +224,7 @@ jobs:
       SOURCE_DATE_EPOCH: ${{ inputs.source-date-epoch }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: owfeed/owfeed/setup@v0.5.1
+      - uses: owfeed/owfeed/setup@v0.5.2
         with:
           version: ${{ inputs.owfeed-version }}
 
@@ -317,7 +323,7 @@ jobs:
       OWFEED_USIGN_KEY: ${{ secrets.OWFEED_USIGN_KEY || secrets.usign-key }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: owfeed/owfeed/setup@v0.5.1
+      - uses: owfeed/owfeed/setup@v0.5.2
         with:
           version: ${{ inputs.owfeed-version }}
 
