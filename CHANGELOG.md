@@ -2,6 +2,18 @@
 
 Dates are when the tag was cut. Anything not listed is documentation or tests.
 
+## v0.5.2 — 2026-09-14
+
+- **Changed:** `owfeed-version` is optional in `feed.yml` and `package.yml`, and defaults
+  to the release the workflow is tagged with. A required version was a second pin next to
+  `uses: .../feed.yml@vX.Y.Z`, and dependabot moves only the first: owfeed-packages ran
+  `feed.yml@v0.5.1` with an owfeed v0.4.5 binary, every job green. Leave the input unset
+  and the `uses:` line is the whole pin. Setting it still works as before.
+- **Fixed:** the README said the signing keys had to be repository secrets. The publish
+  job declares its environment, so environment secrets reach it through
+  `secrets: inherit` — which is how `feed.yml` is documented and how owfeed-packages runs.
+- **Dependencies:** `github.com/klauspost/compress` 1.20.0.
+
 ## v0.5.1 — 2026-08-31
 
 - **Added:** `install-if` on a package. apk installs such a package by itself once every

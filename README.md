@@ -23,13 +23,13 @@ Or a release binary, checked against the attestation GitHub's own workflow produ
 against a checksum from the same release, which whoever replaced the binary could replace too:
 
 ```sh
-gh release download v0.5.1 -R owfeed/owfeed -p 'owfeed-linux-amd64'
+gh release download v0.5.2 -R owfeed/owfeed -p 'owfeed-linux-amd64'
 gh attestation verify owfeed-linux-amd64 -R owfeed/owfeed \
   --signer-workflow owfeed/owfeed/.github/workflows/release.yml
 chmod +x owfeed-linux-amd64 && sudo mv owfeed-linux-amd64 /usr/local/bin/owfeed
 ```
 
-In GitHub Actions, `owfeed/owfeed/setup@v0.5.1` does that verification for you. Builds exist for
+In GitHub Actions, `owfeed/owfeed/setup@v0.5.2` does that verification for you. Builds exist for
 linux and darwin, amd64 and arm64.
 
 **What it needs.** Nothing for `build`, `sign`, `index` or `publish`: the apk toolchain is fetched
@@ -210,13 +210,10 @@ jobs:
       pages: write
       id-token: write
       actions: read
-    uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.1
+    uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.2
+    secrets: inherit             # the publish job reads the keys from its environment
     with:
-      owfeed-version: v0.5.1
       smoke-releases: "25.12 24.10"
-    secrets:
-      sign-key: ${{ secrets.OWFEED_SIGN_KEY }}
-      usign-key: ${{ secrets.OWFEED_USIGN_KEY }}   # only if you serve 24.10
 ```
 
 That splits build from publish so the signing key is never in the job that runs your build
@@ -224,15 +221,21 @@ scripts, gates the upload on `owfeed publish`, and installs the packages on a re
 before any of it goes out. `pre-build:` and `post-index:` take shell if your feed fetches or
 checks anything of its own.
 
-The signing secrets have to be repository or organization secrets, not environment ones: a
-calling job has no environment, so it cannot read an environment secret in order to pass it on.
-The `environment:` on the publish job is still what gates the run behind a reviewer.
+The pin is the `uses:` line. The workflow installs the owfeed release it is tagged with, so a
+dependabot bump of that line moves the binary too. Set `owfeed-version:` only to run a different
+release.
+
+Store the signing keys as secrets of the `feed` environment, named `OWFEED_SIGN_KEY` and
+`OWFEED_USIGN_KEY` (the second only if you serve 24.10). The publish job declares that
+environment, so with `secrets: inherit` it reads them directly, and no other workflow in the
+repository can. The `sign-key:` and `usign-key:` secrets are the fallback for keys kept at
+repository scope.
 
 If you want the steps yourself, take the tool and leave the shape:
 
 ```yaml
-- uses: owfeed/owfeed/setup@v0.5.1
-  with: { version: v0.5.1 }
+- uses: owfeed/owfeed/setup@v0.5.2
+  with: { version: v0.5.2 }
 - run: owfeed --frozen-lock build && owfeed sign && owfeed index
   env:
     OWFEED_SIGN_KEY: ${{ secrets.OWFEED_SIGN_KEY }}

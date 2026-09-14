@@ -24,13 +24,13 @@ go install owfeed.org/owfeed/cmd/owfeed@latest
 с контрольной суммой из того же релиза, которую подменивший бинарь подменил бы заодно:
 
 ```sh
-gh release download v0.5.1 -R owfeed/owfeed -p 'owfeed-linux-amd64'
+gh release download v0.5.2 -R owfeed/owfeed -p 'owfeed-linux-amd64'
 gh attestation verify owfeed-linux-amd64 -R owfeed/owfeed \
   --signer-workflow owfeed/owfeed/.github/workflows/release.yml
 chmod +x owfeed-linux-amd64 && sudo mv owfeed-linux-amd64 /usr/local/bin/owfeed
 ```
 
-В GitHub Actions эту проверку делает за вас `owfeed/owfeed/setup@v0.5.1`. Сборки есть под linux и
+В GitHub Actions эту проверку делает за вас `owfeed/owfeed/setup@v0.5.2`. Сборки есть под linux и
 darwin, amd64 и arm64.
 
 **Что нужно рядом.** Для `build`, `sign`, `index` и `publish` — ничего: apk-тулчейн скачивается из
@@ -210,13 +210,10 @@ jobs:
       pages: write
       id-token: write
       actions: read
-    uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.1
+    uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.2
+    secrets: inherit             # publish-job читает ключи из своего environment
     with:
-      owfeed-version: v0.5.1
       smoke-releases: "25.12 24.10"
-    secrets:
-      sign-key: ${{ secrets.OWFEED_SIGN_KEY }}
-      usign-key: ${{ secrets.OWFEED_USIGN_KEY }}   # только если обслуживаете 24.10
 ```
 
 Он разводит сборку и публикацию, чтобы ключ подписи не оказался в job, который выполняет ваши
@@ -224,15 +221,19 @@ jobs:
 до того, как что-либо уедет. `pre-build:` и `post-index:` принимают шелл, если ваш фид что-то
 докачивает или проверяет сам.
 
-Ключи подписи должны быть секретами репозитория или организации, не environment: у вызывающего
-job нет environment, поэтому прочитать environment-секрет и передать дальше он не может.
-`environment:` на publish-job при этом остаётся тем, что ставит прогон за ревьюера.
+Пин — это строка `uses:`. Workflow ставит тот релиз owfeed, которым помечен сам, поэтому бамп этой
+строки от dependabot двигает и бинарь. `owfeed-version:` задавайте, только если нужен другой релиз.
+
+Ключи подписи храните как секреты environment `feed` с именами `OWFEED_SIGN_KEY` и
+`OWFEED_USIGN_KEY` (второй — только если обслуживаете 24.10). Publish-job объявляет этот
+environment, поэтому с `secrets: inherit` читает их напрямую, а другие workflow репозитория — нет.
+Секреты `sign-key:` и `usign-key:` — запасной вариант для ключей на уровне репозитория.
 
 Если шаги нужны свои — берите инструмент, оставьте форму:
 
 ```yaml
-- uses: owfeed/owfeed/setup@v0.5.1
-  with: { version: v0.5.1 }
+- uses: owfeed/owfeed/setup@v0.5.2
+  with: { version: v0.5.2 }
 - run: owfeed --frozen-lock build && owfeed sign && owfeed index
   env:
     OWFEED_SIGN_KEY: ${{ secrets.OWFEED_SIGN_KEY }}

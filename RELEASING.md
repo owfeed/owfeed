@@ -4,7 +4,8 @@ The repository references its own release tag in places that have to be moved be
 the tag exists, so the tag contains its own correct self-reference.
 
 1. `.github/workflows/feed.yml` AND `.github/workflows/package.yml` — every
-   `uses: owfeed/owfeed/setup@vX.Y.Z` line, one per job, and the tags in the usage
+   `uses: owfeed/owfeed/setup@vX.Y.Z` line, one per job, the `default:` of the
+   `owfeed-version` input, and the tags in the usage
    comments at the top, which name the workflow's own ref as well. Do not count
    them from memory; `grep -rc 'v<previous>' .github/workflows/` is the check.
 2. `README.md` and `README_ru.md` — the download example and the action snippets.
