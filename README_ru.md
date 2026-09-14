@@ -24,13 +24,13 @@ go install owfeed.org/owfeed/cmd/owfeed@latest
 с контрольной суммой из того же релиза, которую подменивший бинарь подменил бы заодно:
 
 ```sh
-gh release download v0.5.2 -R owfeed/owfeed -p 'owfeed-linux-amd64'
+gh release download v0.5.3 -R owfeed/owfeed -p 'owfeed-linux-amd64'
 gh attestation verify owfeed-linux-amd64 -R owfeed/owfeed \
   --signer-workflow owfeed/owfeed/.github/workflows/release.yml
 chmod +x owfeed-linux-amd64 && sudo mv owfeed-linux-amd64 /usr/local/bin/owfeed
 ```
 
-В GitHub Actions эту проверку делает за вас `owfeed/owfeed/setup@v0.5.2`. Сборки есть под linux и
+В GitHub Actions эту проверку делает за вас `owfeed/owfeed/setup@v0.5.3`. Сборки есть под linux и
 darwin, amd64 и arm64.
 
 **Что нужно рядом.** Для `build`, `sign`, `index` и `publish` — ничего: apk-тулчейн скачивается из
@@ -210,7 +210,7 @@ jobs:
       pages: write
       id-token: write
       actions: read
-    uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.2
+    uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.3
     secrets: inherit             # publish-job читает ключи из своего environment
     with:
       smoke-releases: "25.12 24.10"
@@ -232,7 +232,7 @@ environment, поэтому с `secrets: inherit` читает их напрям
 Если шаги нужны свои — берите инструмент, оставьте форму:
 
 ```yaml
-- uses: owfeed/owfeed/setup@v0.5.2       # ставит owfeed v0.5.2
+- uses: owfeed/owfeed/setup@v0.5.3       # ставит owfeed v0.5.3
 - run: owfeed --frozen-lock build && owfeed sign && owfeed index
   env:
     OWFEED_SIGN_KEY: ${{ secrets.OWFEED_SIGN_KEY }}

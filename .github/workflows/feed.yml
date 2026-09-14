@@ -43,7 +43,7 @@ name: owfeed feed
 #         pages: write
 #         id-token: write
 #         actions: read
-#       uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.2
+#       uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.3
 #       secrets: inherit        # so the publish job can read the environment's key
 #       with:
 #         pre-build: for d in packages/*/; do ./tools/fetch.sh "$d"; done
@@ -59,7 +59,7 @@ name: owfeed feed
 #         pages: write          # granting less than any of its jobs declares fails
 #         id-token: write       # at startup rather than skipping that job. The
 #         actions: read         # check job narrows itself back to contents: read,
-#       uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.2   # so nothing that
+#       uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.3   # so nothing that
 #       with:                                                     # runs holds it.
 #         dry-run: true         # throwaway keys, no environment, nothing published
 #         pre-build: for d in packages/*/; do ./tools/fetch.sh "$d"; done
@@ -181,7 +181,7 @@ jobs:
       SOURCE_DATE_EPOCH: ${{ inputs.source-date-epoch }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: owfeed/owfeed/setup@v0.5.2
+      - uses: owfeed/owfeed/setup@v0.5.3
         with:
           version: ${{ inputs.owfeed-version }}
 
@@ -225,7 +225,7 @@ jobs:
       SOURCE_DATE_EPOCH: ${{ inputs.source-date-epoch }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: owfeed/owfeed/setup@v0.5.2
+      - uses: owfeed/owfeed/setup@v0.5.3
         with:
           version: ${{ inputs.owfeed-version }}
 
@@ -324,7 +324,7 @@ jobs:
       OWFEED_USIGN_KEY: ${{ secrets.OWFEED_USIGN_KEY || secrets.usign-key }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: owfeed/owfeed/setup@v0.5.2
+      - uses: owfeed/owfeed/setup@v0.5.3
         with:
           version: ${{ inputs.owfeed-version }}
 

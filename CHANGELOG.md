@@ -2,7 +2,7 @@
 
 Dates are when the tag was cut. Anything not listed is documentation or tests.
 
-## Unreleased
+## v0.5.3 — 2026-09-14
 
 - **Fixed:** `owfeed/owfeed/setup@vX.Y.Z` with no `version:` installs owfeed vX.Y.Z.
   The default was `latest`, so a step that looked pinned installed whatever was newest,
