@@ -64,7 +64,7 @@ func TestGenerateRoundTripsAsSEC1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadPrivate: %v", err)
 	}
-	if back.D.Cmp(key.D) != 0 {
+	if !back.Equal(key) {
 		t.Error("LoadPrivate returned a different key")
 	}
 

@@ -29,6 +29,11 @@ Dates are when the tag was cut. Anything not listed is documentation or tests.
 - **Fixed:** the temporary file `owfeed sign` re-deflates into, `.owfeed-squeeze-*.tmp`, is
   never listed in `sha256sums`, and `owfeed publish` refuses a tree that still holds one,
   because the upload takes the whole tree. Only a run killed mid-step leaves one.
+- **Fixed:** the binaries are built with Go 1.26.9. go.mod said 1.25.3, so CI and releases
+  linked a standard library in which govulncheck finds 28 vulnerabilities reachable from
+  owfeed's code — net/http, crypto/tls, net/url, encoding/asn1 among them. 1.25.14, the last
+  1.25 release, still leaves 9 that are fixed only on 1.26.9, because 1.25 is no longer
+  supported; on 1.26.9 govulncheck finds none.
 - **Dependencies:** `github.com/foobaz/go-zopfli` v0.0.0-20260611111302-2b73a4c8c2e9
   (Apache-2.0, standard library only), reached only through `compression: zopfli`.
 
