@@ -50,7 +50,11 @@ jobs:
               -ldflags "-s -w -X main.version=${version#v}" \
               -o "dist/owfeed-${os}-${arch}" ./cmd/owfeed
           done
-          cd dist && sha256sum owfeed-* > SHA256SUMS
+          # The binaries link third-party code whose licences travel with it. The
+          # file is checked against what cmd/owfeed links by TestThirdPartyLicenses,
+          # which the test step above has just passed.
+          cp THIRD_PARTY_LICENSES dist/
+          cd dist && sha256sum owfeed-* THIRD_PARTY_LICENSES > SHA256SUMS
           cat SHA256SUMS
 
       # One attestation covering all four binaries, not four attestations: the action
