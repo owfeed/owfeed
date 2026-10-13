@@ -169,6 +169,43 @@ than whatever apk happens to be installed: Alpine's apk, or any build with zstd
 compiled in, will happily write an index that parses on the build host and dies on
 every router with "ADB compression not supported".
 
+## The default deflate is already level 9, and naming a level changes the magic
+
+`mkpkg` and `adbsign` both take `--compression ALGORITHM[:LEVEL]`. With no level the
+package is written at deflate's best level already: the stream after the 4-byte `ADBd`
+is byte for byte the one `--compression deflate:9` writes after its 6-byte header. Naming
+any level switches the header to `ADBc` plus an algorithm byte and a level byte, so
+`deflate:9` buys two bytes and nothing else. Payload: `luci-mod-network` from OpenWrt's
+24.10.8 feed, unpacked; apk-tools 3.0.5 from the 25.12.5 SDK; date 2026-10-13.
+
+```sh
+$APK mkpkg --no-xattrs -I name:luci-mod-network -I version:26.283.50386-r1 -I arch:noarch -F payload -o u0.apk
+$APK mkpkg --no-xattrs --compression deflate:9 -I name:luci-mod-network -I version:26.283.50386-r1 -I arch:noarch -F payload -o u9.apk
+ls -l u0.apk u9.apk                                  # 66051, 66053
+head -c 6 u9.apk | od -An -tu1                       #   65 68 66 99 1 9  ("ADBc", deflate, 9)
+cmp <(tail -c +5 u0.apk) <(tail -c +7 u9.apk)       # identical
+```
+
+`adbsign` keeps whatever the file already had, and `--compression` on it re-encodes:
+
+| `mkpkg` | `adbsign` | after signing | magic | `apk verify` |
+|---|---|---|---|---|
+| default | default | 66,178 | `ADBd` | OK |
+| `deflate:9` | default | 66,172 | `ADBc 01 09` | OK |
+| `deflate:6` | default | 66,320 | `ADBc 01 06` | OK |
+| default | `deflate:9` | 66,178 | `ADBc 01 09` | OK |
+| `deflate:9` | `deflate` | 66,176 | `ADBd` | OK |
+
+Signed sizes move by a few bytes between runs, because each ECDSA signature is fresh. So
+apk-tools' own option has no smaller setting to offer, and owfeed passes none. The short
+spelling the help text lists does not parse:
+
+```sh
+$APK mkpkg -C deflate:9 ...
+#   ERROR: command line: unrecognized option 'C'
+#   exit=1
+```
+
 ## `installed-size` and `file-size` are computed, not supplied
 
 They appear in the index without being passed to `--info` (and `--info` rejects them):
