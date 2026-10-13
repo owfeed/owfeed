@@ -76,7 +76,7 @@ func Sign(ctx context.Context, tool *apk.Tool, dir string, s Signer) ([]string, 
 		if _, err := tool.RunOK(ctx, apk.Invocation{
 			Workdir: dir,
 			KeyDir:  s.KeyDir,
-			Args:    []string{"--allow-untrusted", "adbsign", "--sign-key", apk.KeyRef(s.KeyName), p},
+			Args:    []string{"--allow-untrusted", "adbsign", "--sign-key", apk.KeyRef(s.KeyName), "./" + p},
 		}); err != nil {
 			return nil, err
 		}
@@ -229,9 +229,10 @@ func writeJSON(ctx context.Context, tool *apk.Tool, dir string) error {
 // key's identity, which is the first 16 bytes of SHA-512 over the public key point.
 var sigLine = regexp.MustCompile(`^# sig [^ ]+ [^ ]+ ([0-9a-f]{32})`)
 
-// Signatures returns the key identities a file is signed by.
+// Signatures returns the key identities a file is signed by. file is a name inside
+// dir, and reaches apk as ./file so a name starting with '-' is not read as an option.
 func Signatures(ctx context.Context, tool *apk.Tool, dir, file string) ([]string, error) {
-	res, err := tool.RunOK(ctx, apk.Invocation{Workdir: dir, Args: []string{"adbdump", file}})
+	res, err := tool.RunOK(ctx, apk.Invocation{Workdir: dir, Args: []string{"adbdump", "./" + file}})
 	if err != nil {
 		return nil, err
 	}

@@ -25,7 +25,7 @@ var nameLine = regexp.MustCompile(`(?m)^info:\n  name: (\S+)$`)
 // PackageName reads the name a package declares from the package itself, so a
 // decision about a file never rests on how its name splits around a dash.
 func PackageName(ctx context.Context, tool *apk.Tool, dir, file string) (string, error) {
-	res, err := tool.RunOK(ctx, apk.Invocation{Workdir: dir, Args: []string{"adbdump", file}})
+	res, err := tool.RunOK(ctx, apk.Invocation{Workdir: dir, Args: []string{"adbdump", "./" + file}})
 	if err != nil {
 		return "", err
 	}
@@ -101,13 +101,13 @@ func Squeeze(ctx context.Context, tool *apk.Tool, dir, file string, s Signer, tr
 	name := filepath.Base(tmp.Name())
 	res, err := tool.Run(ctx, apk.Invocation{
 		Workdir: dir, TrustDir: trustDir,
-		Args: []string{"--keys-dir", apk.TrustDirRef(), "verify", name},
+		Args: []string{"--keys-dir", apk.TrustDirRef(), "verify", "./" + name},
 	})
 	if err != nil {
 		return 0, 0, err
 	}
 	if res.ExitCode != 0 {
-		return 0, 0, fmt.Errorf("%s re-deflated with zopfli no longer verifies: `apk --keys-dir <trust-dir> verify %s` exit %d: %s",
+		return 0, 0, fmt.Errorf("%s re-deflated with zopfli no longer verifies: `apk --keys-dir <trust-dir> verify ./%s` exit %d: %s",
 			file, name, res.ExitCode, strings.TrimSpace(res.Stdout+res.Stderr))
 	}
 	ids, err := Signatures(ctx, tool, dir, name)

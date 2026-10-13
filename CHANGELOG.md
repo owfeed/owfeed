@@ -16,6 +16,8 @@ Dates are when the tag was cut. Anything not listed is documentation or tests.
   luci-mod-network rebuilt by owfeed came out at 69,923 B against the 24.10.8 feed's
   66,541 B. They are now written at the best level, 66,150 B. Two builds of the same input
   are still byte-identical. Measured in `docs/apk-behaviour.md`.
+- **Fixed:** a package file whose name starts with `-` reaches apk as `./name`. `owfeed sign`
+  passed it bare, and `apk adbsign` read it as an option: "unrecognized option '-'".
 - **Dependencies:** `github.com/foobaz/go-zopfli` v0.0.0-20260611111302-2b73a4c8c2e9
   (Apache-2.0, standard library only), reached only through `compression: zopfli`.
 

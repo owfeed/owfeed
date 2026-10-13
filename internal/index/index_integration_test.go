@@ -216,3 +216,21 @@ func TestIntegrationIndexRejectsForeignKey(t *testing.T) {
 		t.Fatal("Build accepted packages signed by a key the feed does not publish")
 	}
 }
+
+// A file in dist whose name starts with '-' reaches apk as ./name, not as an option.
+func TestIntegrationAFileNamedLikeAnOption(t *testing.T) {
+	tool := testapk.Require(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	f := newFeed(t, tool)
+	if err := os.Rename(filepath.Join(f.pkgDir, "luci-app-one-1.0-r1.apk"), filepath.Join(f.pkgDir, "-v-1.0-r1.apk")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := index.Sign(ctx, tool, f.pkgDir, f.signer); err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+	if name, err := index.PackageName(ctx, tool, f.pkgDir, "-v-1.0-r1.apk"); err != nil || name != "luci-app-one" {
+		t.Fatalf("PackageName = %q, %v", name, err)
+	}
+}
