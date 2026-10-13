@@ -2,7 +2,7 @@
 
 Dates are when the tag was cut. Anything not listed is documentation or tests.
 
-## Unreleased
+## v0.5.5 — 2026-10-13
 
 - **Added:** `compression: zopfli` on a package writes its deflate streams with zopfli:
   2-5% smaller, read by opkg and apk unchanged, at 20-45 times the time and about 600 MB of
