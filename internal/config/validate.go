@@ -300,6 +300,13 @@ func (c *Config) validatePackages(path string) error {
 				return errf(path, "%s.i18n.dest %q must be an absolute path inside the package", where, p.I18n.Dest)
 			}
 		}
+		if p.Compression != "" && p.Compression != CompressionZopfli {
+			return &Error{
+				Path: path,
+				Msg:  fmt.Sprintf("%s.compression %q is not supported", where, p.Compression),
+				Hint: "leave it unset for deflate at its best standard level, or set `compression: zopfli` for smaller packages at the cost of build time",
+			}
+		}
 		for t := range p.Scripts {
 			if !validScriptTypes[t] {
 				return &Error{

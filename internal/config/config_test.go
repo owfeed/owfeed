@@ -99,6 +99,12 @@ func TestRejects(t *testing.T) {
 			wantSub: "noarch",
 		},
 		{
+			// A typo here would otherwise build at the standard level without a word.
+			name:    "unknown compression",
+			src:     strings.Replace(minimal, "files: ./dist/root", "files: ./dist/root\n    compression: zopfli-max", 1),
+			wantSub: "compression",
+		},
+		{
 			name:    "missing version field",
 			src:     strings.Replace(minimal, "version: 1\n", "", 1),
 			wantSub: "version",
@@ -198,6 +204,16 @@ func TestKeyringPackageAccepted(t *testing.T) {
 	}
 	if c.Signing.KeyringPackage == nil || *c.Signing.KeyringPackage {
 		t.Error("keyring-package: false should be honoured")
+	}
+}
+
+func TestCompressionZopfliAccepted(t *testing.T) {
+	c := mustParse(t, strings.Replace(minimal, "files: ./dist/root", "files: ./dist/root\n    compression: zopfli", 1))
+	if c.Packages[0].Compression != CompressionZopfli {
+		t.Errorf("compression = %q", c.Packages[0].Compression)
+	}
+	if mustParse(t, minimal).Packages[0].Compression != "" {
+		t.Error("compression must default to unset: the standard level")
 	}
 }
 

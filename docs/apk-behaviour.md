@@ -206,6 +206,77 @@ $APK mkpkg -C deflate:9 ...
 #   exit=1
 ```
 
+## apk signs the uncompressed ADB, so a signed package can be re-deflated
+
+The signature covers the ADB inside the deflate stream, not the compressed bytes. A
+signed package inflated and deflated again by another compressor still verifies; one
+byte changed in the ADB does not. Same `luci-mod-network` package as above, signed with
+a throwaway key whose public half is in `trust/`:
+
+```sh
+python3 - <<'PY'
+import zlib
+d = open('def.apk', 'rb').read()
+adb = zlib.decompressobj(-15).decompress(d[4:])           # raw deflate after 'ADBd'
+c = zlib.compressobj(1, zlib.DEFLATED, -15)               # any other encoder
+open('re.apk', 'wb').write(b'ADBd' + c.compress(adb) + c.flush())
+bad = bytearray(adb); bad[-40] ^= 1
+c = zlib.compressobj(9, zlib.DEFLATED, -15)
+open('bad.apk', 'wb').write(b'ADBd' + c.compress(bytes(bad)) + c.flush())
+PY
+$APK verify --keys-dir $PWD/trust re.apk               #   re.apk: OK
+$APK verify --keys-dir $PWD/trust bad.apk              #   bad.apk: file integrity error
+                                                         #   exit=1, on stdout; stderr empty
+```
+
+That is what makes `compression: zopfli` possible on the apk side, and also what limits
+it: `adbsign` re-deflates the whole file at its own level, so the re-deflate has to come
+after it. A second `adbsign` undoes it, which is what a feed adding its own signature
+does:
+
+```sh
+$APK --allow-untrusted adbsign --sign-key feed.pem luci-mod-network-26.283.50386-r1.apk
+#   64202 B before (zopfli, one signature), 66716 B after (two signatures)
+```
+
+## zopfli: 2-5% smaller, read unchanged by apk and opkg, tens of times slower
+
+zopfli (the pure-Go port, `github.com/foobaz/go-zopfli`) writes a standard deflate
+stream, smaller than the best zlib level and much slower to produce. owfeed uses it only
+for a package whose config says `compression: zopfli`: the `.ipk` streams at build time,
+the `.apk` in `owfeed sign` after `adbsign`, keeping `ADBd`, checking that the new
+stream inflates to the identical ADB and that `apk verify` passes with the signing key
+before the file is replaced.
+
+`luci-mod-network` from OpenWrt's 24.10.8 feed, unpacked, `SOURCE_DATE_EPOCH=1791640786
+owfeed build` then `owfeed sign --key file:k.pem dist`. Date: 2026-10-13, 20 cores.
+
+| | `.ipk` | `.apk`, signed | `build` | `sign` |
+|---|---|---|---|---|
+| owfeed 0.5.4 | 69,923 | 66,605 | 0.02 s | 0.01 s |
+| best standard level | 66,150 | 66,607 | 0.02 s | 0.01 s |
+| `compression: zopfli` | 63,913 | 64,201 | 0.91 s | 0.68 s |
+
+Signed `.apk` sizes move by a few bytes between runs with the ECDSA signature. Two
+builds of each are byte-identical, zopfli included.
+
+The cost grows with the payload. Two stripped x86-64 binaries, 10,656,711 B, packaged
+as `example-daemon`, measured with `/usr/bin/time`:
+
+| | `.ipk` | `.apk`, signed | `build` | `sign` |
+|---|---|---|---|---|
+| best standard level | 4,615,630 | 4,525,110 | 1.93 s, 75 MB | 1.19 s, 10 MB |
+| `compression: zopfli` | 4,407,065 | 4,430,803 | 38.41 s, 634 MB | 32.86 s, 613 MB |
+
+zopfli alone over that payload's 10,670,080 B tar: 4,430,163 B in 32.04 s and 605 MB,
+against Go's `gzip.BestCompression` at 4,622,170 B in 0.73 s.
+
+Installed with no `--allow-untrusted` anywhere: `TestIntegrationAcceptanceZopfli` builds,
+signs (`zopfli noarch/luci-app-acceptance-1.0.0-r1.apk: 4935 -> 4723 B`), indexes and
+runs `doctor` on a feed, then installs it on `openwrt/rootfs:x86-64-25.12.4` from the
+index and again with `apk add ./file.apk`. `TestIntegrationInstallsOnOpkg/zopfli=true`
+installs a zopfli `.ipk` with opkg on `openwrt/rootfs:x86-64-24.10.8`.
+
 ## `installed-size` and `file-size` are computed, not supplied
 
 They appear in the index without being passed to `--info` (and `--info` rejects them):

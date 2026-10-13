@@ -12,6 +12,7 @@ twenty lines.
   real dependencies
 - [A compiled binary: a static Go daemon](#a-compiled-binary-a-static-go-daemon) — several architectures
 - [Both release lines from one config](#both-release-lines-from-one-config) — apk and opkg
+- [Fewer bytes for more build time](#fewer-bytes-for-more-build-time) — `compression: zopfli`
 
 ---
 
@@ -385,3 +386,30 @@ line's index at all, which is the point of saying which lines a package belongs 
 publishing everything everywhere and hoping dependencies sort it out.
 
 Verified on real routers with [owlab](https://github.com/owfeed/owlab), one per manager.
+
+---
+
+## Fewer bytes for more build time
+
+Every router that installs or upgrades a package downloads it. A package that ships often and is
+small enough to compress in a second or two can trade build time for size:
+
+```yaml
+- name: luci-app-example
+  build: mkpkg
+  arch: noarch
+  version: 1.0.0-r1
+  files: ./dist/root
+  compression: zopfli
+```
+
+The streams are written with zopfli instead of the best standard deflate level: 2-5% smaller in the
+measurements, read by opkg and apk exactly as before. A 250 KB LuCI payload takes about a second more
+to build and to sign; a 10 MB binary takes 30-40 s and about 600 MB of memory for each. Leave it unset
+and nothing changes.
+
+The `.ipk` is compressed this way when it is built. The `.apk` is re-deflated by `owfeed sign`, after
+apk's own signing step, because that step re-compresses the whole file. The same holds downstream: a
+feed that adds its own signature to your `.apk` re-compresses it and the saving is gone, while a feed
+with `sign-packages: false` serves your bytes as they are. The numbers are in
+[apk-behaviour.md](apk-behaviour.md#zopfli-2-5-smaller-read-unchanged-by-apk-and-opkg-tens-of-times-slower).

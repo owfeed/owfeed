@@ -55,7 +55,10 @@ func buildIPK(req Request, arch, root string) (*Result, error) {
 		Conflicts:   p.Conflicts,
 		Conffiles:   p.Conffiles,
 		Scripts:     ipkScripts(name, p, req.Root),
-	}, ipk.Options{Payload: payload, OutDir: outDir, Epoch: req.SourceDateEpoch})
+	}, ipk.Options{
+		Payload: payload, OutDir: outDir, Epoch: req.SourceDateEpoch,
+		Zopfli: p.Compression == config.CompressionZopfli,
+	})
 	if err != nil {
 		return nil, err
 	}

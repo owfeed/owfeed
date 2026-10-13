@@ -28,6 +28,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"owfeed.org/owfeed/internal/squeeze"
 )
 
 // ArchAll is what 24.10 calls an architecture-independent package.
@@ -66,6 +68,9 @@ type Options struct {
 	// Epoch is stamped on every archive member. opkg does not care, but two builds
 	// of the same content should produce the same bytes.
 	Epoch time.Time
+	// Zopfli writes the three gzip streams with zopfli instead of the best standard
+	// level. See config.Package.Compression for the trade.
+	Zopfli bool
 }
 
 // FileName is the on-disk name, which uses underscores where apk uses dashes.
@@ -84,23 +89,19 @@ func Build(p Package, opts Options) (string, error) {
 		epoch = time.Unix(0, 0)
 	}
 
-	data, installed, err := dataArchive(opts.Payload, epoch)
+	data, installed, err := dataArchive(opts.Payload, epoch, opts.Zopfli)
 	if err != nil {
 		return "", err
 	}
 	// Installed-Size is the uncompressed size of the payload archive, which is what
 	// ipkg-build measures and what opkg's free-space check reads.
-	control, err := controlArchive(p, installed, opts.Payload, epoch)
+	control, err := controlArchive(p, installed, opts.Payload, epoch, opts.Zopfli)
 	if err != nil {
 		return "", err
 	}
 
 	var outer bytes.Buffer
-	gz, err := newGzip(&outer)
-	if err != nil {
-		return "", err
-	}
-	tw := tar.NewWriter(gz)
+	tw := tar.NewWriter(&outer)
 	// The order is the script's. opkg reads the members by name rather than by
 	// position, but a container that differs from every other one in the wild is a
 	// container waiting to meet a stricter reader.
@@ -119,32 +120,29 @@ func Build(p Package, opts Options) (string, error) {
 	if err := tw.Close(); err != nil {
 		return "", err
 	}
-	if err := gz.Close(); err != nil {
-		return "", err
+	packed, err := compress(outer.Bytes(), opts.Zopfli)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", p.Name, err)
 	}
 
 	if err := os.MkdirAll(opts.OutDir, 0o755); err != nil {
 		return "", err
 	}
 	out := filepath.Join(opts.OutDir, FileName(p.Name, p.Version, p.Arch))
-	if err := os.WriteFile(out, outer.Bytes(), 0o644); err != nil {
+	if err := os.WriteFile(out, packed, 0o644); err != nil {
 		return "", err
 	}
 	return out, nil
 }
 
 // dataArchive packs the payload and reports its uncompressed size.
-func dataArchive(payload string, epoch time.Time) ([]byte, int64, error) {
+func dataArchive(payload string, epoch time.Time, zopfli bool) ([]byte, int64, error) {
 	var buf bytes.Buffer
-	gz, err := newGzip(&buf)
-	if err != nil {
-		return nil, 0, err
-	}
-	tw := tar.NewWriter(gz)
+	tw := tar.NewWriter(&buf)
 
 	var size int64
 	var paths []string
-	err = filepath.WalkDir(payload, func(path string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(payload, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -217,14 +215,12 @@ func dataArchive(payload string, epoch time.Time) ([]byte, int64, error) {
 	if err := tw.Close(); err != nil {
 		return nil, 0, err
 	}
-	if err := gz.Close(); err != nil {
-		return nil, 0, err
-	}
-	return buf.Bytes(), size, nil
+	gz, err := compress(buf.Bytes(), zopfli)
+	return gz, size, err
 }
 
 // controlArchive packs the metadata opkg reads.
-func controlArchive(p Package, installed int64, payload string, epoch time.Time) ([]byte, error) {
+func controlArchive(p Package, installed int64, payload string, epoch time.Time, zopfli bool) ([]byte, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Package: %s\n", p.Name)
 	fmt.Fprintf(&b, "Version: %s\n", p.Version)
@@ -260,11 +256,7 @@ func controlArchive(p Package, installed int64, payload string, epoch time.Time)
 	}
 
 	var buf bytes.Buffer
-	gz, err := newGzip(&buf)
-	if err != nil {
-		return nil, err
-	}
-	tw := tar.NewWriter(gz)
+	tw := tar.NewWriter(&buf)
 
 	names := make([]string, 0, len(members))
 	for n := range members {
@@ -284,19 +276,30 @@ func controlArchive(p Package, installed int64, payload string, epoch time.Time)
 	if err := tw.Close(); err != nil {
 		return nil, err
 	}
-	if err := gz.Close(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return compress(buf.Bytes(), zopfli)
 }
 
-// newGzip opens one of the container's three gzip streams at the best level.
+// compress writes one of the container's three gzip streams, at the best level.
 //
 // Go's default level is not zlib's: on one 274 KB data.tar it wrote 67,762 B where
 // GNU gzip -6, the level OpenWrt's own 24.10 packages use, wrote 65,555 B and
 // BestCompression 65,382 B. See docs/apk-behaviour.md.
-func newGzip(w io.Writer) (*gzip.Writer, error) {
-	return gzip.NewWriterLevel(w, gzip.BestCompression)
+func compress(raw []byte, zopfli bool) ([]byte, error) {
+	if zopfli {
+		return squeeze.Gzip(raw)
+	}
+	var buf bytes.Buffer
+	gz, err := gzip.NewWriterLevel(&buf, gzip.BestCompression)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := gz.Write(raw); err != nil {
+		return nil, err
+	}
+	if err := gz.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func writeField(b *strings.Builder, name, value string) {
