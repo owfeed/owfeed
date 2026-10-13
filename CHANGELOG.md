@@ -9,7 +9,8 @@ Dates are when the tag was cut. Anything not listed is documentation or tests.
   memory for a 10 MB payload. The `.ipk` is compressed that way when it is built; the `.apk`
   is re-deflated by `owfeed sign` after `adbsign`, which re-compresses the whole file, and
   replaced only once the new stream inflates to the identical ADB, keeps `ADBd` and passes
-  `apk verify` with the signing key. Unset, nothing changes. A feed that adds its own
+  `apk verify` with the signing key, and the file has not changed since it was read. A
+  symlink, a device or anything past 256 MiB is refused. Unset, nothing changes. A feed that adds its own
   signature later re-compresses the `.apk` and the saving is gone.
 - **Fixed:** `.ipk` packages are about 5% smaller. The container's three gzip streams were
   written at Go's default level, which compresses worse than gzip's: OpenWrt's own
