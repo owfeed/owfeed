@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -116,7 +117,18 @@ func requireTreeFiles(out, feedName string) error {
 		return fail(exitPublish, "%s holds a %s at its root; indexes belong in the per-architecture "+
 			"directories the install snippet points at", out, index.IndexFile)
 	}
-	return nil
+	// publish cannot leave a file out of the upload, which takes the whole tree, so a
+	// temporary file from a killed `owfeed sign` is a reason to stop.
+	return filepath.WalkDir(out, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() && index.IsSqueezeTemp(d.Name()) {
+			return fail(exitPublish, "%s is a temporary file a killed `owfeed sign` left behind, "+
+				"and the upload would publish it\n  delete it, then run `owfeed publish` again", path)
+		}
+		return nil
+	})
 }
 
 // requireOriginFor decides whether every package must say where it came from.
