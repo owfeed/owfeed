@@ -188,6 +188,15 @@ func thirdPartyLicenses() ([]byte, error) {
 		"Generated from the Go module cache by\n" +
 		"  go test ./cmd/owfeed -run TestThirdPartyLicenses -update\n" +
 		"which fails while a module linked into any release target is missing here.\n")
+
+	// Every binary links the standard library and runtime of the toolchain go.mod
+	// pins, which is the one the release workflow installs from it.
+	goVersion, goLicence, err := stdlibLicence()
+	if err != nil {
+		return nil, err
+	}
+	fmt.Fprintf(&b, "\n%s\nGo standard library and runtime go%s\n%s\n\n--- LICENSE\n\n%s",
+		rule, goVersion, rule, strings.TrimRight(string(goLicence), "\n")+"\n")
 	for _, m := range mods {
 		fmt.Fprintf(&b, "\n%s\n%s %s\n%s\n", rule, m.path, m.version, rule)
 		files, err := licenceFiles(m)
@@ -232,4 +241,30 @@ func thirdPartyLicenses() ([]byte, error) {
 		fmt.Fprintf(&b, "\nThe Apache License, Version 2.0, those headers refer to:\n\n%s", strings.TrimRight(string(apache), "\n")+"\n")
 	}
 	return b.Bytes(), nil
+}
+
+// stdlibLicence reads LICENSE from the GOROOT of the toolchain go.mod pins, named
+// through GOTOOLCHAIN so the text and version do not depend on the Go that runs the
+// test. A distribution's Go may not ship the file at all.
+func stdlibLicence() (string, []byte, error) {
+	mod, err := os.ReadFile("../../go.mod")
+	if err != nil {
+		return "", nil, err
+	}
+	m := regexp.MustCompile(`(?m)^toolchain go(\S+)$`).FindSubmatch(mod)
+	if m == nil {
+		m = regexp.MustCompile(`(?m)^go (\S+)$`).FindSubmatch(mod)
+	}
+	if m == nil {
+		return "", nil, fmt.Errorf("go.mod names no Go version")
+	}
+	version := string(m[1])
+	cmd := exec.Command("go", "env", "GOROOT")
+	cmd.Env = append(os.Environ(), "GOTOOLCHAIN=go"+version)
+	root, err := cmd.Output()
+	if err != nil {
+		return "", nil, fmt.Errorf("GOTOOLCHAIN=go%s go env GOROOT: %w", version, err)
+	}
+	text, err := os.ReadFile(filepath.Join(strings.TrimSpace(string(root)), "LICENSE"))
+	return version, text, err
 }
