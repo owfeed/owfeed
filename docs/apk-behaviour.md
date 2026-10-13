@@ -605,6 +605,39 @@ From `scripts/ipkg-build` on the openwrt-24.10 branch:
 in that order, GNU format, numeric owner, sorted by name, fixed mtime.
 `Installed-Size` in the control file is the *uncompressed* size of `data.tar.gz`.
 
+## OpenWrt's packages are gzip level 6, and Go's level 6 is not gzip's
+
+Measured on `luci-mod-network_26.283.50386~24db9bf_all.ipk` from OpenWrt's own 24.10.8 feed:
+its three gzip streams all carry XFL 0, and its `data.tar.gz` is byte for byte what GNU
+gzip writes at its default level, not at `-9`:
+
+```sh
+B=https://downloads.openwrt.org/releases/24.10.8/packages/x86_64/luci
+curl -sfS "$B/luci-mod-network_26.283.50386~24db9bf_all.ipk" -o n.ipk
+mkdir o && tar -xzf n.ipk -C o && zcat o/data.tar.gz > data.tar
+od -An -tu1 -j8 -N1 o/data.tar.gz                        #   0  (XFL; -9 writes 2)
+gzip -6 -n -c data.tar | tail -c +11 | cmp - <(tail -c +11 o/data.tar.gz)   # identical, 65561 B
+gzip -9 -n -c data.tar | wc -c                           #   65311
+```
+
+Go's `compress/flate` at its default level is not zlib's level 6. owfeed 0.5.4 wrote its
+streams with `gzip.NewWriter` and came out larger than the SDK. The same package rebuilt
+by owfeed from that payload, `SOURCE_DATE_EPOCH=1791640786 owfeed build`, one 274,432 B
+`data.tar` in both builds:
+
+| | `data.tar.gz` | `.ipk` |
+|---|---|---|
+| OpenWrt 24.10.8 (GNU gzip -6, its own tar) | 65,561 | 66,541 |
+| GNU gzip -6 over owfeed's tar | 65,555 | — |
+| GNU gzip -9 over owfeed's tar | 65,323 | — |
+| owfeed 0.5.4, `gzip.NewWriter` | 67,762 | 69,923 |
+| owfeed, `gzip.BestCompression` | 65,382 | 66,150 |
+
+The outer stream compresses a tar that is almost entirely the already-compressed
+`data.tar.gz`, and at the default level it added 1,750 B over its members where the best
+level adds 376 B. Every stream is now written at `gzip.BestCompression`, XFL 2, which
+`TestBuildCompressesEveryStreamAtBestLevel` holds.
+
 ## `all`, never `noarch`
 
 opkg calls an architecture-independent package `all`. apk rejects `all` as

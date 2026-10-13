@@ -96,7 +96,10 @@ func Build(p Package, opts Options) (string, error) {
 	}
 
 	var outer bytes.Buffer
-	gz := gzip.NewWriter(&outer)
+	gz, err := newGzip(&outer)
+	if err != nil {
+		return "", err
+	}
 	tw := tar.NewWriter(gz)
 	// The order is the script's. opkg reads the members by name rather than by
 	// position, but a container that differs from every other one in the wild is a
@@ -133,12 +136,15 @@ func Build(p Package, opts Options) (string, error) {
 // dataArchive packs the payload and reports its uncompressed size.
 func dataArchive(payload string, epoch time.Time) ([]byte, int64, error) {
 	var buf bytes.Buffer
-	gz := gzip.NewWriter(&buf)
+	gz, err := newGzip(&buf)
+	if err != nil {
+		return nil, 0, err
+	}
 	tw := tar.NewWriter(gz)
 
 	var size int64
 	var paths []string
-	err := filepath.WalkDir(payload, func(path string, d fs.DirEntry, err error) error {
+	err = filepath.WalkDir(payload, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -254,7 +260,10 @@ func controlArchive(p Package, installed int64, payload string, epoch time.Time)
 	}
 
 	var buf bytes.Buffer
-	gz := gzip.NewWriter(&buf)
+	gz, err := newGzip(&buf)
+	if err != nil {
+		return nil, err
+	}
 	tw := tar.NewWriter(gz)
 
 	names := make([]string, 0, len(members))
@@ -279,6 +288,15 @@ func controlArchive(p Package, installed int64, payload string, epoch time.Time)
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// newGzip opens one of the container's three gzip streams at the best level.
+//
+// Go's default level is not zlib's: on one 274 KB data.tar it wrote 67,762 B where
+// GNU gzip -6, the level OpenWrt's own 24.10 packages use, wrote 65,555 B and
+// BestCompression 65,382 B. See docs/apk-behaviour.md.
+func newGzip(w io.Writer) (*gzip.Writer, error) {
+	return gzip.NewWriterLevel(w, gzip.BestCompression)
 }
 
 func writeField(b *strings.Builder, name, value string) {

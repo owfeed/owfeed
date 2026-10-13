@@ -2,6 +2,14 @@
 
 Dates are when the tag was cut. Anything not listed is documentation or tests.
 
+## Unreleased
+
+- **Fixed:** `.ipk` packages are about 5% smaller. The container's three gzip streams were
+  written at Go's default level, which compresses worse than gzip's: OpenWrt's own
+  luci-mod-network rebuilt by owfeed came out at 69,923 B against the 24.10.8 feed's
+  66,541 B. They are now written at the best level, 66,150 B. Two builds of the same input
+  are still byte-identical. Measured in `docs/apk-behaviour.md`.
+
 ## v0.5.4 — 2026-09-14
 
 - **Fixed:** exit 8 means an upstream outage and nothing else. A 404 for a pinned SDK
