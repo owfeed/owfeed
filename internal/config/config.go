@@ -329,7 +329,25 @@ type Package struct {
 	// ABIVersion is appended to the package name and mirrored into
 	// tags:openwrt:abiversion, which ImageBuilder needs to resolve the dependency.
 	ABIVersion string `yaml:"abiversion"`
+
+	// Compression "zopfli" writes the package's deflate streams with zopfli instead
+	// of the best standard level: 2-5% fewer bytes for every router that downloads
+	// it, read by opkg and apk unchanged, at 20-45 times the time and about 600 MB of
+	// memory for a 10 MB payload -- measured in docs/apk-behaviour.md. Unset keeps the
+	// standard level, so no other package's build time or bytes change.
+	//
+	// The .ipk is squeezed when it is built. The .apk is squeezed by `owfeed sign`,
+	// after the signature is checked, because apk adbsign re-deflates the whole file
+	// at its own level; a package signed again later by a feed with its own key is
+	// re-deflated by that adbsign and loses the gain.
+	Compression Compression `yaml:"compression"`
 }
+
+// Compression selects how a package's deflate streams are written.
+type Compression string
+
+// CompressionZopfli spends build time on smaller packages. See Package.Compression.
+const CompressionZopfli Compression = "zopfli"
 
 // Noarch is the architecture of a package that carries no compiled code.
 //

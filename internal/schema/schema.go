@@ -60,9 +60,10 @@ var customTypes = map[string]map[string]any{
 // the values themselves come from the code. The association is by hand; the
 // values are not, which is the half that drifts.
 var enums = map[string][]string{
-	"Release.format": {"FormatAPK", "FormatIPK"},
-	"Package.build":  {"BuildMkpkg", "BuildSDK"},
-	"Publish.target": {"TargetGitHubPages", "TargetS3", "TargetRsync"},
+	"Release.format":      {"FormatAPK", "FormatIPK"},
+	"Package.build":       {"BuildMkpkg", "BuildSDK"},
+	"Package.compression": {"CompressionZopfli"},
+	"Publish.target":      {"TargetGitHubPages", "TargetS3", "TargetRsync"},
 }
 
 // constFields are fields with exactly one accepted value, named by the constant

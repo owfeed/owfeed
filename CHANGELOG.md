@@ -4,11 +4,20 @@ Dates are when the tag was cut. Anything not listed is documentation or tests.
 
 ## Unreleased
 
+- **Added:** `compression: zopfli` on a package writes its deflate streams with zopfli:
+  2-5% smaller, read by opkg and apk unchanged, at 20-45 times the time and about 600 MB of
+  memory for a 10 MB payload. The `.ipk` is compressed that way when it is built; the `.apk`
+  is re-deflated by `owfeed sign` after `adbsign`, which re-compresses the whole file, and
+  replaced only once the new stream inflates to the identical ADB, keeps `ADBd` and passes
+  `apk verify` with the signing key. Unset, nothing changes. A feed that adds its own
+  signature later re-compresses the `.apk` and the saving is gone.
 - **Fixed:** `.ipk` packages are about 5% smaller. The container's three gzip streams were
   written at Go's default level, which compresses worse than gzip's: OpenWrt's own
   luci-mod-network rebuilt by owfeed came out at 69,923 B against the 24.10.8 feed's
   66,541 B. They are now written at the best level, 66,150 B. Two builds of the same input
   are still byte-identical. Measured in `docs/apk-behaviour.md`.
+- **Dependencies:** `github.com/foobaz/go-zopfli` v0.0.0-20260611111302-2b73a4c8c2e9
+  (Apache-2.0, standard library only), reached only through `compression: zopfli`.
 
 ## v0.5.4 — 2026-09-14
 

@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -61,6 +63,29 @@ func owfeed(t *testing.T, dir string, args ...string) (int, string) {
 
 func TestIntegrationAcceptance(t *testing.T) {
 	requireIntegration(t)
+	acceptance(t, feedConfig)
+}
+
+// The same feed with the package's deflate streams written by zopfli: sign must
+// re-deflate the signed .apk, and index, doctor and a real router must all accept it.
+func TestIntegrationAcceptanceZopfli(t *testing.T) {
+	requireIntegration(t)
+	out := acceptance(t, strings.Replace(feedConfig, "    files: ./pkg/root\n", "    files: ./pkg/root\n    compression: zopfli\n", 1))
+	m := regexp.MustCompile(`zopfli noarch/luci-app-acceptance-1\.0\.0-r1\.apk: (\d+) -> (\d+) B`).FindStringSubmatch(out)
+	if m == nil {
+		t.Fatalf("sign did not re-deflate the package:\n%s", out)
+	}
+	before, _ := strconv.Atoi(m[1])
+	after, _ := strconv.Atoi(m[2])
+	if after >= before {
+		t.Errorf("zopfli %d -> %d B: nothing gained", before, after)
+	}
+}
+
+// acceptance runs the maintainer's commands over a feed made from config, installs
+// the result on a router, and returns what `owfeed sign` printed.
+func acceptance(t *testing.T, config string) string {
+	t.Helper()
 
 	// run() chdirs, so restore it for whatever runs next in this process.
 	wd, err := os.Getwd()
@@ -74,7 +99,7 @@ func TestIntegrationAcceptance(t *testing.T) {
 	writeFile(t, filepath.Join(payload, "etc", "config", "acceptance"), "config acceptance 'main'\n\toption enabled '1'\n", 0o644)
 	writeFile(t, filepath.Join(payload, "etc", "init.d", "acceptance"), "#!/bin/sh /etc/rc.common\nSTART=95\nstart() { :; }\n", 0o755)
 	writeFile(t, filepath.Join(payload, "www", "luci-static", "acceptance", "style.css"), "body{margin:0}\n", 0o644)
-	writeFile(t, filepath.Join(feed, "owfeed.yml"), feedConfig, 0o644)
+	writeFile(t, filepath.Join(feed, "owfeed.yml"), config, 0o644)
 
 	// Real catalogues, so the compiled .lmo files are the ones LuCI would load
 	// rather than a toy the compiler happens to accept.
@@ -98,6 +123,7 @@ func TestIntegrationAcceptance(t *testing.T) {
 	}
 	t.Setenv("OWFEED_SIGN_KEY", string(pem))
 
+	var signOut string
 	for _, step := range []struct {
 		name string
 		args []string
@@ -111,8 +137,12 @@ func TestIntegrationAcceptance(t *testing.T) {
 		{"doctor", []string{"--frozen-lock", "doctor"}},
 		{"publish", []string{"publish", "--dry-run"}},
 	} {
-		if code, out := owfeed(t, feed, step.args...); code != 0 {
+		code, out := owfeed(t, feed, step.args...)
+		if code != 0 {
 			t.Fatalf("%s exited %d:\n%s", step.name, code, out)
+		}
+		if step.name == "sign" {
+			signOut = out
 		}
 	}
 
@@ -129,6 +159,7 @@ func TestIntegrationAcceptance(t *testing.T) {
 	}
 
 	installOnRouter(t, filepath.Join(feed, "out"))
+	return signOut
 }
 
 // installOnRouter is the assertion the whole project exists for: a stock image, the

@@ -92,14 +92,52 @@ func (a *app) sign(ctx context.Context, args []string) error {
 	}
 	sort.Strings(arches)
 
+	// Packages whose config asks for zopfli are re-deflated here, after adbsign,
+	// because adbsign re-deflates the whole file at apk's own level. Without a
+	// config there is nothing that asked, and apk's bytes stand.
+	zopfli := map[string]bool{}
+	if c != nil {
+		for _, p := range c.Packages {
+			if p.Compression == config.CompressionZopfli {
+				zopfli[p.EffectiveName()] = true
+			}
+		}
+	}
+	var trustDir string
+	if len(zopfli) > 0 {
+		trustDir, err = keys.StagePublic(os.TempDir(), keyFileName, &key.PublicKey)
+		if err != nil {
+			return wrap(exitKey, err)
+		}
+		defer os.RemoveAll(trustDir)
+	}
+
 	var signed []string
 	for _, arch := range arches {
-		got, err := index.Sign(ctx, tool, filepath.Join(dir, arch), signer)
+		archDir := filepath.Join(dir, arch)
+		got, err := index.Sign(ctx, tool, archDir, signer)
 		if err != nil {
 			return wrap(exitKey, err)
 		}
 		for _, p := range got {
 			a.logf("signed %s/%s", arch, p)
+			if len(zopfli) == 0 {
+				continue
+			}
+			name, err := index.PackageName(ctx, tool, archDir, p)
+			if err != nil {
+				return wrap(exitKey, err)
+			}
+			if !zopfli[name] {
+				continue
+			}
+			before, after, err := index.Squeeze(ctx, tool, archDir, p, signer, trustDir)
+			if err != nil {
+				return fail(exitKey, "%v\n  %s/%s is left signed as apk wrote it; to publish that, "+
+					"remove `compression: zopfli` from package %s\n  check: OWF303, every package verifies against the signing key",
+					err, arch, p, name)
+			}
+			a.logf("zopfli %s/%s: %d -> %d B", arch, p, before, after)
 		}
 		signed = append(signed, got...)
 	}
