@@ -14,8 +14,8 @@ Dates are when the tag was cut. Anything not listed is documentation or tests.
   nothing re-deflates the `.apk`, and `owfeed sign` says so. Unset, nothing changes. A feed that adds its own
   signature later re-compresses the `.apk` and the saving is gone.
 - **Added:** each release ships `THIRD_PARTY_LICENSES` beside the binaries, and lists it in
-  `SHA256SUMS`: the licence texts of every module linked into them, which Apache-2.0 and
-  BSD-3-Clause require to travel with a binary. It is generated from the module cache, and
+  `SHA256SUMS`: the licence texts of the Go standard library and of every module linked
+  into them, which BSD-3-Clause and Apache-2.0 require to travel with a binary. It is generated from the module cache, and
   `TestThirdPartyLicenses` fails while a module linked into any release target is missing
   from it. go-zopfli ships no licence file, so its source headers are quoted and the Apache
   License 2.0 they name is reproduced in full.
