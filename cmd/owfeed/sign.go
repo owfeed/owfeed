@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"owfeed.org/owfeed/internal/apk"
 	"owfeed.org/owfeed/internal/arch"
@@ -53,6 +54,15 @@ func (a *app) sign(ctx context.Context, args []string) error {
 	// release is exactly the case this must not silently skip.
 	if c != nil && *keySpec == "" && !*c.Signing.SignPackages {
 		a.logf("signing.sign-packages is false: leaving packages as their authors built them")
+		if z := zopfliPackages(c); len(z) > 0 {
+			names := make([]string, 0, len(z))
+			for n := range z {
+				names = append(names, n)
+			}
+			sort.Strings(names)
+			a.logf("note: compression: zopfli on %s reached the .ipk only; an .apk is re-deflated "+
+				"when owfeed signs it, and it is not signing", strings.Join(names, ", "))
+		}
 		a.logf("the index is still signed by this feed — run `owfeed index` next")
 		return nil
 	}
@@ -95,14 +105,7 @@ func (a *app) sign(ctx context.Context, args []string) error {
 	// Packages whose config asks for zopfli are re-deflated here, after adbsign,
 	// because adbsign re-deflates the whole file at apk's own level. Without a
 	// config there is nothing that asked, and apk's bytes stand.
-	zopfli := map[string]bool{}
-	if c != nil {
-		for _, p := range c.Packages {
-			if p.Compression == config.CompressionZopfli {
-				zopfli[p.EffectiveName()] = true
-			}
-		}
-	}
+	zopfli := zopfliPackages(c)
 	var trustDir string
 	if len(zopfli) > 0 {
 		trustDir, err = keys.StagePublic(os.TempDir(), keyFileName, &key.PublicKey)
@@ -133,9 +136,7 @@ func (a *app) sign(ctx context.Context, args []string) error {
 			}
 			before, after, err := index.Squeeze(ctx, tool, archDir, p, signer, trustDir)
 			if err != nil {
-				return fail(exitKey, "%v\n  %s/%s is left signed as apk wrote it; to publish that, "+
-					"remove `compression: zopfli` from package %s\n  check: OWF303, every package verifies against the signing key",
-					err, arch, p, name)
+				return squeezeFailed(err, arch+"/"+p, name)
 			}
 			a.logf("zopfli %s/%s: %d -> %d B", arch, p, before, after)
 		}
@@ -146,6 +147,30 @@ func (a *app) sign(ctx context.Context, args []string) error {
 	// drops arguments it does not recognise, so it cannot pass --allow-untrusted.
 	a.logf("%d package(s) signed by key %s", len(signed), signer.Identity)
 	return nil
+}
+
+// squeezeFailed says what stopped and what ran. The check is index.Squeeze's own
+// `apk verify` with the signing key; doctor's OWF303 later checks only which key
+// signed, so naming it here would claim a verification it does not do.
+func squeezeFailed(err error, file, pkg string) error {
+	return fail(exitKey, "%v\n  %s was not replaced. The step that stopped is `owfeed sign`'s zopfli re-deflate, "+
+		"which inflates the new stream and runs `apk --keys-dir <signing key> verify` on it before the rename\n"+
+		"  fix: run `owfeed build` and `owfeed sign` again, or remove `compression: zopfli` from package %s "+
+		"to publish apk's own deflate", err, file, pkg)
+}
+
+// zopfliPackages names the packages whose config asks for `compression: zopfli`.
+func zopfliPackages(c *config.Config) map[string]bool {
+	out := map[string]bool{}
+	if c == nil {
+		return out
+	}
+	for _, p := range c.Packages {
+		if p.Compression == config.CompressionZopfli {
+			out[p.EffectiveName()] = true
+		}
+	}
+	return out
 }
 
 // keyFileName is what the private key is called inside its staging directory. The
