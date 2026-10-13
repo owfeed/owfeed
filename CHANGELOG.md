@@ -13,6 +13,12 @@ Dates are when the tag was cut. Anything not listed is documentation or tests.
   symlink, a device or anything past 256 MiB is refused. With `signing.sign-packages: false`
   nothing re-deflates the `.apk`, and `owfeed sign` says so. Unset, nothing changes. A feed that adds its own
   signature later re-compresses the `.apk` and the saving is gone.
+- **Added:** each release ships `THIRD_PARTY_LICENSES` beside the binaries, and lists it in
+  `SHA256SUMS`: the licence texts of every module linked into them, which Apache-2.0 and
+  BSD-3-Clause require to travel with a binary. It is generated from the module cache, and
+  `TestThirdPartyLicenses` fails while a module linked into any release target is missing
+  from it. go-zopfli ships no licence file, so its source headers are quoted and the Apache
+  License 2.0 they name is reproduced in full.
 - **Fixed:** `.ipk` packages are about 5% smaller. The container's three gzip streams were
   written at Go's default level, which compresses worse than gzip's: OpenWrt's own
   luci-mod-network rebuilt by owfeed came out at 69,923 B against the 24.10.8 feed's
