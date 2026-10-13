@@ -34,6 +34,7 @@ packages:
     version: 1.0.0-r1
     files: ./pkg/root
     description: "Built by owfeed's acceptance test."
+    url: https://example.org/luci-app-acceptance
     depends: [luci-base]
     conffiles: ["/etc/config/acceptance"]
     i18n:
@@ -118,7 +119,7 @@ func TestIntegrationAcceptance(t *testing.T) {
 	// The generated instructions and the built tree have to agree; 701 checks that
 	// against a README, and here the point is that the snippet is not decorative.
 	_, snippet := owfeed(t, feed, "install-snippet", "--format", "sh")
-	for _, want := range []string{"/etc/apk/keys/acceptance.pem", "packages.adb", "/etc/sysupgrade.conf"} {
+	for _, want := range []string{"/etc/apk/keys/acceptance.pem", "packages.adb", "/lib/upgrade/keep.d/acceptance"} {
 		if !strings.Contains(snippet, want) {
 			t.Errorf("install-snippet omits %q:\n%s", want, snippet)
 		}
