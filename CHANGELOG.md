@@ -19,6 +19,9 @@ Dates are when the tag was cut. Anything not listed is documentation or tests.
   are still byte-identical. Measured in `docs/apk-behaviour.md`.
 - **Fixed:** a package file whose name starts with `-` reaches apk as `./name`. `owfeed sign`
   passed it bare, and `apk adbsign` read it as an option: "unrecognized option '-'".
+- **Fixed:** the temporary file `owfeed sign` re-deflates into, `.owfeed-squeeze-*.tmp`, is
+  never listed in `sha256sums`, and `owfeed publish` refuses a tree that still holds one,
+  because the upload takes the whole tree. Only a run killed mid-step leaves one.
 - **Dependencies:** `github.com/foobaz/go-zopfli` v0.0.0-20260611111302-2b73a4c8c2e9
   (Apache-2.0, standard library only), reached only through `compression: zopfli`.
 

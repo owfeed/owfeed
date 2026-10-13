@@ -84,3 +84,28 @@ func TestWriteSums(t *testing.T) {
 		t.Errorf("second run changed sha256sums:\n%s", again)
 	}
 }
+
+// A killed `owfeed sign` can leave Squeeze's temporary file behind; it is not part
+// of the feed and must not be vouched for. Other dotfiles are, so only the exact
+// pattern is skipped.
+func TestWriteSumsSkipsASqueezeLeftover(t *testing.T) {
+	dir := t.TempDir()
+	for _, n := range []string{"a.apk", ".owfeed-squeeze-123.tmp", ".kept"} {
+		if err := os.WriteFile(filepath.Join(dir, n), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := WriteSums(dir); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, SumsFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(got), "owfeed-squeeze") {
+		t.Errorf("sha256sums lists the leftover:\n%s", got)
+	}
+	if !strings.Contains(string(got), " *a.apk\n") || !strings.Contains(string(got), " *.kept\n") {
+		t.Errorf("sha256sums dropped a real file:\n%s", got)
+	}
+}

@@ -20,6 +20,17 @@ import (
 // default level, which is what the on-device apk installs. See docs/apk-behaviour.md.
 var adbDeflate = []byte("ADBd")
 
+// squeezeTemp is the name Squeeze writes the re-deflated package under before
+// renaming it into place. Not *.apk, so a killed run's leftover is never signed or
+// indexed; IsSqueezeTemp keeps it out of what is hashed and published.
+const squeezeTemp = ".owfeed-squeeze-*.tmp"
+
+// IsSqueezeTemp reports whether name is a temporary file Squeeze left behind.
+func IsSqueezeTemp(name string) bool {
+	ok, _ := filepath.Match(squeezeTemp, name)
+	return ok
+}
+
 // maxADB bounds what a package may inflate to before zopfli sees it: 25 times the
 // 10.6 MB payload that took 634 MB of zopfli memory. A stream that inflates past it
 // is not a router package, and reading on would let one file exhaust memory.
@@ -95,8 +106,7 @@ func Squeeze(ctx context.Context, tool *apk.Tool, dir, file string, s Signer, tr
 		return len(old), len(old), nil
 	}
 
-	// Not *.apk: a temporary file left by a killed run would be signed and indexed.
-	tmp, err := os.CreateTemp(dir, ".owfeed-squeeze-*.tmp")
+	tmp, err := os.CreateTemp(dir, squeezeTemp)
 	if err != nil {
 		return 0, 0, err
 	}

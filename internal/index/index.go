@@ -298,7 +298,7 @@ func WriteSums(dir string) error {
 	}
 	var names []string
 	for _, e := range entries {
-		if e.IsDir() || e.Name() == SumsFile {
+		if e.IsDir() || e.Name() == SumsFile || IsSqueezeTemp(e.Name()) {
 			continue
 		}
 		names = append(names, e.Name())
