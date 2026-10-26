@@ -2,7 +2,7 @@
 
 Dates are when the tag was cut. Anything not listed is documentation or tests.
 
-## Unreleased
+## v0.5.6 — 2026-10-26
 
 - **Fixed:** a `package.yml` run over a tag whose release is already published re-checks
   that release and signs nothing. It used to sign again, and `adbsign`'s ECDSA signature
