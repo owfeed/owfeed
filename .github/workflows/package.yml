@@ -106,6 +106,18 @@ on:
         required: false
         type: string
         default: ""
+      extra-artifact:
+        description: >-
+          Name of another artifact from the caller's run whose files are attached to
+          the release as they are: not signed and not in the manifest, so nothing a
+          router installs. A demo site built by a later job belongs here. They go up
+          with the signed files while the release is still a draft, because a
+          repository with immutable releases refuses any upload once a release is
+          published. Release assets are flat, so the artifact holds files and no
+          directories.
+        required: false
+        type: string
+        default: ""
       notes-file:
         description: Path to a file whose contents become the release body.
         required: false
@@ -294,6 +306,50 @@ jobs:
           done
           rmdir dist/*/ 2>/dev/null || true
           ls -l dist
+
+      # Into $RUNNER_TEMP and then dist/, never straight into dist/: a file that shares
+      # a name with a signed one would replace it, and the check below refuses that.
+      - if: steps.state.outputs.published != 'true' && inputs.extra-artifact != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ inputs.extra-artifact }}
+          path: ${{ runner.temp }}/extra-artifact
+
+      - name: Add the unsigned files
+        if: steps.state.outputs.published != 'true' && inputs.extra-artifact != ''
+        env:
+          SRC: ${{ runner.temp }}/extra-artifact
+          ARTIFACT: ${{ inputs.extra-artifact }}
+          PACKAGES: ${{ inputs.artifact }}
+        run: |
+          set -euo pipefail
+          n=0
+          for f in "$SRC"/*; do
+            [ -e "$f" ] || continue
+            name=$(basename "$f")
+            if [ ! -f "$f" ] || [ -L "$f" ]; then
+              echo "::error::$name in artifact $ARTIFACT is not a regular file, and a release asset can only be one. Upload the files themselves to $ARTIFACT, with no directory around them."
+              exit 1
+            fi
+            # Names a router or a feed reads as signed release content.
+            case "$name" in
+              *.apk | *.ipk | *.sig | manifest.txt | notes.md)
+                echo "::error::$name in artifact $ARTIFACT would go up unsigned under a name that readers take as signed. A package belongs in the $PACKAGES artifact, where it is signed and listed; rename anything else."
+                exit 1
+                ;;
+            esac
+            if [ -e "dist/$name" ]; then
+              echo "::error::$name in artifact $ARTIFACT has the name of a file this release already carries, and would replace it. Rename one of them."
+              exit 1
+            fi
+            mv "$f" "dist/$name"
+            echo "unsigned, not in the manifest: $name"
+            n=$((n + 1))
+          done
+          if [ "$n" -eq 0 ]; then
+            echo "::error::artifact $ARTIFACT holds no files to attach. Check the upload-artifact step that names it, or drop extra-artifact."
+            exit 1
+          fi
 
       # The published release, flat, into dist/: what the checks below read on a re-run.
       - name: Fetch the published release

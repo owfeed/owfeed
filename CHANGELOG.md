@@ -26,6 +26,14 @@ Dates are when the tag was cut. Anything not listed is documentation or tests.
 - **Added:** `package.yml` checks, on every release, that the manifest names the
   repository and the tag, and that each file it lists is there with that size and
   sha256, before anything is uploaded.
+- **Added:** `extra-artifact` in `package.yml` names an artifact of the caller's run whose
+  files are attached to the release as they are: unsigned and not in the manifest, such
+  as a demo site. They go up with the draft, before it is published, which is the only
+  time a repository with immutable releases accepts an upload. A caller's job that
+  attached them after `package.yml` had published fails on such a repository. A file
+  named like signed content (`*.apk`, `*.ipk`, `*.sig`, `manifest.txt`, `notes.md`) or
+  like a file the release already carries, a directory, or an empty artifact fails the
+  job before anything is uploaded. Unset, nothing changes.
 
 ## v0.5.5 — 2026-10-13
 

@@ -483,3 +483,70 @@ cp "$f" "$out"`
 		})
 	}
 }
+
+// Files from extra-artifact go up unsigned, so they may not take a name that a router or
+// a feed reads as signed content, nor replace a file the release already carries.
+func TestPackageStepExtraArtifact(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		files map[string]string // under the downloaded artifact
+		code  int
+		log   string
+	}{
+		{name: "a demo site", files: map[string]string{"playground.tar.gz": "tar"}, log: "unsigned, not in the manifest: playground.tar.gz"},
+		{name: "two files", files: map[string]string{"a.tar.gz": "a", "b.txt": "b"}},
+		{name: "a package", files: map[string]string{"luci-app-other-1.0-r1.apk": "apk"}, code: 1, log: "belongs in the owfeed-packages artifact"},
+		{name: "a manifest", files: map[string]string{"manifest.txt": "forged"}, code: 1, log: "readers take as signed"},
+		{name: "the installer's name", files: map[string]string{"install.sh": "other"}, code: 1, log: "would replace it"},
+		{name: "a directory", files: map[string]string{"site/index.html": "<p>"}, code: 1, log: "site in artifact playground is not a regular file"},
+		{name: "nothing", code: 1, log: "holds no files to attach"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newWorkspace(t)
+			src := filepath.Join(w.tmp, "extra-artifact")
+			if err := os.MkdirAll(src, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			for name, body := range tc.files {
+				writeFile(t, filepath.Join(src, name), body, 0o644)
+			}
+			writeFile(t, filepath.Join(w.dir, "dist", "install.sh"), "signed installer", 0o644)
+			w.run("Add the unsigned files", "SRC="+src, "ARTIFACT=playground", "PACKAGES=owfeed-packages").
+				expect(t, tc.code, none, tc.log)
+
+			if got, err := os.ReadFile(filepath.Join(w.dir, "dist", "install.sh")); err != nil || string(got) != "signed installer" {
+				t.Errorf("dist/install.sh is now %q (%v)", got, err)
+			}
+			if tc.code != 0 {
+				return
+			}
+			for name, body := range tc.files {
+				if got, err := os.ReadFile(filepath.Join(w.dir, "dist", name)); err != nil || string(got) != body {
+					t.Errorf("dist/%s = %q (%v), want %q", name, got, err, body)
+				}
+			}
+		})
+	}
+}
+
+// The unsigned files are added after the manifest is written, so it does not list them,
+// and uploaded with the draft: an immutable release refuses any upload once published.
+func TestPackageExtraArtifactRidesInTheDraft(t *testing.T) {
+	order := []string{"Write and sign the manifest", "Add the unsigned files", "upload", "publish"}
+	at := map[string]int{}
+	for i, s := range packageSteps(t) {
+		key := s.Name + s.ID
+		if strings.Contains(s.Uses, "action-gh-release") {
+			key = "upload"
+		}
+		at[key] = i
+	}
+	for i, step := range order {
+		if _, ok := at[step]; !ok {
+			t.Fatalf("package.yml has no release step %q", step)
+		}
+		if i > 0 && at[order[i-1]] >= at[step] {
+			t.Errorf("step %q runs before %q; want the order %q", step, order[i-1], order)
+		}
+	}
+}
