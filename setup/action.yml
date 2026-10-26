@@ -82,12 +82,17 @@ runs:
         # which macOS does not ship and the macOS runner images do not list.
         GH_DEADLINE=120
         gh_deadline() {
-          local pid dog rc=0 dog_rc=0
+          local pid dog rc=0 stopped
+          stopped="$(mktemp)"
           gh "$@" &
           pid=$!
           # Polls, rather than one long sleep, so that it is gone within a second
           # of gh. Its output goes to /dev/null because inside $(...) a process that
-          # still holds the pipe makes the substitution wait for it.
+          # still holds the pipe makes the substitution wait for it. It marks the
+          # stop in a file before it signals gh: an exit code of its own came too
+          # late, because gh could die and be waited for, and the watchdog be
+          # killed, before it reached that exit. Under load 2 of 15 test runs read
+          # such a stop as an answer: exit 7, or "does not verify".
           (
             i=0
             while [ "$i" -lt "$GH_DEADLINE" ]; do
@@ -95,17 +100,19 @@ runs:
               kill -0 "$pid" 2>/dev/null || exit 0
               i=$((i + 1))
             done
+            echo stopped >"$stopped"
             kill -TERM "$pid" 2>/dev/null
-            exit 124
           ) >/dev/null 2>&1 &
           dog=$!
           wait "$pid" || rc=$?
           kill "$dog" 2>/dev/null || true
-          wait "$dog" 2>/dev/null || dog_rc=$?
-          if [ "$rc" -ne 0 ] && [ "$dog_rc" -eq 124 ]; then
+          wait "$dog" 2>/dev/null || true
+          if [ "$rc" -ne 0 ] && [ -s "$stopped" ]; then
+            rm -f "$stopped"
             echo "gh $1 $2: no answer within ${GH_DEADLINE}s; stopped it" >&2
             return 124
           fi
+          rm -f "$stopped"
           return "$rc"
         }
 
