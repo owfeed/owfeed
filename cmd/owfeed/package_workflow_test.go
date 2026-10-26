@@ -107,20 +107,34 @@ type workflowStep struct {
 	Env                     map[string]string
 }
 
-// packageSteps returns the steps of package.yml's release job.
-func packageSteps(t *testing.T) []workflowStep {
+type workflowJob struct {
+	Concurrency struct {
+		Group            string
+		CancelInProgress bool `yaml:"cancel-in-progress"`
+	}
+	Steps []workflowStep
+}
+
+// packageJob returns package.yml's release job.
+func packageJob(t *testing.T) workflowJob {
 	t.Helper()
 	data, err := os.ReadFile("../../.github/workflows/package.yml")
 	if err != nil {
 		t.Fatal(err)
 	}
 	var wf struct {
-		Jobs map[string]struct{ Steps []workflowStep }
+		Jobs map[string]workflowJob
 	}
 	if err := yaml.Unmarshal(data, &wf); err != nil {
 		t.Fatalf("package.yml: %v", err)
 	}
-	return wf.Jobs["release"].Steps
+	return wf.Jobs["release"]
+}
+
+// packageSteps returns the steps of package.yml's release job.
+func packageSteps(t *testing.T) []workflowStep {
+	t.Helper()
+	return packageJob(t).Steps
 }
 
 // packageStep returns the run: script of the release job's step with this id or name.
@@ -190,6 +204,19 @@ func TestPackageRerunSignsNothing(t *testing.T) {
 	// The sign, manifest, upload and publish steps at least; fewer means this test lost them.
 	if guarded < 4 {
 		t.Errorf("found %d steps that sign or write to the release, want at least 4", guarded)
+	}
+}
+
+// Two runs at one tag side by side would both find the release unpublished and both
+// sign, so the job is queued per tag. Cancelling the running one instead would kill a
+// release halfway through its upload.
+func TestPackageRunsOncePerTag(t *testing.T) {
+	c := packageJob(t).Concurrency
+	if !strings.Contains(c.Group, "github.ref }}") {
+		t.Errorf("the release job's concurrency group is %q, want one per github.ref", c.Group)
+	}
+	if c.CancelInProgress {
+		t.Error("the release job cancels a run in progress, which can stop a release halfway through its upload")
 	}
 }
 

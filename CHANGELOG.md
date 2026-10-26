@@ -14,7 +14,9 @@ Dates are when the tag was cut. Anything not listed is documentation or tests.
   checks it against its manifest and checks `latest/download` again. A draft that a
   failed attempt left is signed and published as before. So is a published release
   that holds no `manifest.txt`, which this workflow did not finish, with a warning. To
-  publish a tag anew, delete its release first; the tag stays.
+  publish a tag anew, delete its release first; the tag stays. Runs at one tag queue
+  behind each other, so of two started side by side, such as a tag push and a
+  `workflow_dispatch` at that tag, the second only re-checks what the first published.
 - **Fixed:** the `package.yml` job stops after 30 minutes. It had GitHub's default of
   six hours, and a caller cannot set `timeout-minutes` on a job that `uses:` a workflow.
 - **Fixed:** `package.yml` retries what one blip used to turn red. `owfeed sign` is run
