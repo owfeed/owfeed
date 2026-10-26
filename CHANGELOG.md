@@ -31,6 +31,12 @@ Dates are when the tag was cut. Anything not listed is documentation or tests.
   `actions/cache` does not save over, so every run would fetch the SDK.
 - **Fixed:** an SDK release that is not a point release, such as `SNAPSHOT` or `../..`
   in `--sdk-release`, is refused before anything is fetched or removed.
+- **Fixed:** `owfeed/owfeed/setup` stops each `gh` call after 120 s, and retries it as
+  an outage, then exits 8. Measured with gh 2.103.2 against a proxy that accepts and
+  sends nothing, `gh attestation verify` was still waiting at 90 s, so the step could
+  wait for the job's timeout. `gh release view` and `gh release download` gave up after
+  60 s with `context deadline exceeded`, which the action read as an answer and exited
+  7, the code CI must not retry. That text is now an outage too.
 
 ## v0.5.5 — 2026-10-13
 
