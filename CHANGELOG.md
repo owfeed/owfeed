@@ -36,6 +36,41 @@ Dates are when the tag was cut. Anything not listed is documentation or tests.
   named like signed content (`*.apk`, `*.ipk`, `*.sig`, `manifest.txt`, `notes.md`) or
   like a file the release already carries, a directory, or an empty artifact fails the
   job before anything is uploaded. Unset, nothing changes.
+- **Fixed:** a request to downloads.openwrt.org that receives nothing for 60 s is given
+  up and retried. Nothing bounded it before: a mirror that held the connection open and
+  sent nothing held `owfeed build` or `owfeed sign` until CI killed the job, six hours
+  by default. The SDK fetch is slow enough already that silence says nothing: in a
+  luci-theme-footstrap release (run 38791192704) `owfeed sign` printed nothing for
+  4 min 55 s while it fetched. The same deadline applies to the feed `owfeed verify`
+  reads.
+- **Fixed:** the SDK download continues from the byte where it broke off or stalled,
+  with a `Range` request, instead of failing and starting over at byte 0 on the next
+  run. After 4 breaks with nothing received between them it exits 8 and names the URL
+  and the byte it reached. The SHA-256 is still taken over the whole file, in order, and
+  checked against the signed list. Measured in `docs/apk-behaviour.md`: a download cut
+  at byte 41,943,040 resumed and matched.
+- **Fixed:** a cached SDK is checked before each use. `~/.cache/owfeed/sdk/<release>`
+  now keeps the `sha256sums` the tarball was verified against, its signature and key,
+  and the SHA-256 of each extracted file. The signature has to verify under a key
+  pinned in this binary, and every file has to match. Before, six non-empty files were
+  enough, so a truncated `.apk.bin` passed. A cache that fails is fetched again, and
+  replaced only once the new copy has verified. Runs that share a cache replace it one
+  at a time, under a lock on `sdk/<release>.lock` beside it; a run that fails while
+  fetching says that the cache there failed its check, and why. This catches a damaged
+  or stale cache, not a planted one: whoever can write the cache can rewrite the
+  record, so a cache saved by a less trusted job is still not safe to restore into a
+  job that holds a signing key. Caches written by 0.5.5 and earlier have no record, so
+  the first run after upgrading fetches the SDK again. In CI, add the owfeed version to
+  the cache key: a key that names only `owfeed.lock` restores the old cache as a hit,
+  which `actions/cache` does not save over, so every run would fetch the SDK.
+- **Fixed:** an SDK release that is not a point release, such as `SNAPSHOT` or `../..`
+  in `--sdk-release`, is refused before anything is fetched or removed.
+- **Fixed:** `owfeed/owfeed/setup` stops each `gh` call after 120 s, and retries it as
+  an outage, then exits 8. Measured with gh 2.103.2 against a proxy that accepts and
+  sends nothing, `gh attestation verify` was still waiting at 90 s, so the step could
+  wait for the job's timeout. `gh release view` and `gh release download` gave up after
+  60 s with `context deadline exceeded`, which the action read as an answer and exited
+  7, the code CI must not retry. That text is now an outage too.
 
 ## v0.5.5 — 2026-10-13
 

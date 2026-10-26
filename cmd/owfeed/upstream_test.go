@@ -78,6 +78,8 @@ func TestWrapUpstream(t *testing.T) {
 		{&netx.OutageError{Attempts: 4, Err: errors.New("connection refused")}, exitUpstream},
 		{errors.New("sha256sums from x: signature does not verify"), exitCheck},
 		{netx.Outage(errors.New("docker pull: Bad Gateway")), exitUpstream},
+		// The SDK download that stopped arriving, as the last resume gives it up.
+		{&netx.OutageError{Attempts: 4, Err: fmt.Errorf("GET x: broke off at byte 1: %w", &netx.StalledError{Idle: time.Minute})}, exitUpstream},
 	}
 	for _, c := range cases {
 		if got := codeFor(wrapUpstream(c.err)); got != c.code {

@@ -630,6 +630,52 @@ key id in it. The trusted set of key ids and their hashes has to be pinned indep
 `internal/usign` verifies this natively, so no C toolchain is on the path; the test in
 that package verifies a real 25.12.5 release artifact.
 
+### A cached extraction can be re-checked by hand
+
+Beside the six members, the cache directory keeps `sha256sums` and `sha256sums.sig` as
+downloaded, the key they verified with as `sha256sums.pub`, and `members.sha256`, the
+hash of each member as it came out of the tarball. owfeed checks all of it before each
+use. A person can do the same in that directory:
+
+```sh
+$ cd ~/.cache/owfeed/sdk/25.12.5
+$ usign -V -m sha256sums -p sha256sums.pub     # usign from openwrt/rootfs
+OK
+$ sha256sum -c members.sha256
+staging_dir/host/bin/apk: OK
+staging_dir/host/bin/.apk.bin: OK
+...
+```
+
+That proves the members are the ones owfeed extracted, not that they came out of the
+signed tarball: whoever can write the cache can rewrite `members.sha256` to match.
+Date: 2026-10-26.
+
+## downloads.openwrt.org resumes a download, and ignores If-Range
+
+The 25.12.5 SDK is 284,842,599 bytes. A `Range` request is answered 206 from the byte
+asked for. `If-Range` is not honoured: a validator that does not match the file still
+gets 206 rather than the whole file.
+
+```sh
+U=https://downloads.openwrt.org/releases/25.12.5/targets/x86/64/openwrt-sdk-25.12.5-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+curl -sS -o /dev/null -D - -r 0-0 "$U"
+#   HTTP/2 206, etag: "6a4333e7-10fa5a67", content-range: bytes 0-0/284842599
+curl -sS -o /dev/null -D - -r 284842590- -H 'If-Range: "00000000-00000000"' "$U"
+#   HTTP/2 206, content-range: bytes 284842590-284842598/284842599
+curl -sS -o /dev/null -D - -r 284842590- -H 'If-Range: Mon, 01 Jan 2024 00:00:00 GMT' "$U"
+#   HTTP/2 206, content-range: bytes 284842590-284842598/284842599
+curl -sS -o /dev/null -D - -r 284842599- "$U"
+#   HTTP/2 416, content-range: bytes */284842599
+```
+
+So a resumed download cannot count on the server to say that the file changed between
+two requests; the pieces of two files would arrive as one. What catches that is the
+SHA-256 against the signed `sha256sums`, taken over every byte in order. Through
+owfeed's own client, an SDK download cut at byte 41,943,040 was asked for again with
+`Range: bytes=41943040-`, answered `206 Partial Content`, and the whole matched the
+signed hash. Date: 2026-10-26.
+
 ---
 
 # opkg, 24.10 and earlier

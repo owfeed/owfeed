@@ -2,17 +2,20 @@ package apk
 
 import (
 	"archive/tar"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 
 	"github.com/klauspost/compress/zstd"
 
@@ -31,17 +34,35 @@ import (
 // runs into a temporary directory and is renamed into place only after the tarball's
 // SHA-256 matches the signed list; on any failure the temporary tree is removed, so
 // a partially-verified toolchain can never be picked up by a later run.
-func Acquire(ctx context.Context, hc *http.Client, cacheRoot, pointRelease string) (string, error) {
+//
+// A cached extraction is used only while checkCache passes. One that does not -- from
+// an owfeed that kept no record, or changed since -- is fetched again, and replaced
+// only once the new extraction has passed every check.
+func Acquire(ctx context.Context, hc *http.Client, cacheRoot, pointRelease string) (_ string, err error) {
+	if !pointRE.MatchString(pointRelease) {
+		return "", fmt.Errorf("SDK release %q is not a point release such as 25.12.5; "+
+			"set one as sdk-release in owfeed.lock (`owfeed lock --update` writes it) or pass --sdk-release", pointRelease)
+	}
 	dir := filepath.Join(cacheRoot, "sdk", pointRelease)
-	if ok, err := cacheValid(dir); err != nil {
-		return "", err
-	} else if ok {
+	stale := checkCache(dir)
+	if stale == nil {
 		return dir, nil
+	}
+	// Without this a run offline -- the first after upgrading from an owfeed that kept
+	// no record -- fails on a request it had no visible reason to make, beside a
+	// cache the user can see.
+	if _, statErr := os.Stat(dir); statErr == nil {
+		defer func() {
+			if err != nil {
+				// stale as text: the fetch's error alone decides outage or answer.
+				err = fmt.Errorf("%w\n  the cached SDK at %s fails its check, so it is fetched again: %s", err, dir, stale.Error())
+			}
+		}()
 	}
 
 	base := fmt.Sprintf("https://downloads.openwrt.org/releases/%s/targets/%s", pointRelease, sdkTarget)
 
-	sums, err := verifiedChecksums(ctx, hc, base)
+	sums, sig, key, err := verifiedChecksums(ctx, hc, base)
 	if err != nil {
 		return "", err
 	}
@@ -66,79 +87,215 @@ func Acquire(ctx context.Context, hc *http.Client, cacheRoot, pointRelease strin
 	if err := downloadAndExtract(ctx, hc, base+"/"+name, wantHash, tmp); err != nil {
 		return "", err
 	}
-	if err := os.Rename(tmp, dir); err != nil {
-		// A concurrent owfeed may have won the race and populated the cache; if the
-		// destination is now valid, that is a success, not a conflict.
-		if ok, verr := cacheValid(dir); verr == nil && ok {
-			return dir, nil
-		}
+	if err := writeRecord(tmp, sums, sig, key); err != nil {
+		return "", err
+	}
+	if err := place(tmp, dir); err != nil {
 		return "", err
 	}
 	return dir, nil
 }
 
-// cacheValid reports whether dir already holds a usable extraction. Presence of the
-// directory is not enough — an interrupted earlier run could have left a partial tree
-// that would then be trusted forever.
-func cacheValid(dir string) (bool, error) {
-	for _, m := range sdkMembers {
-		st, err := os.Stat(filepath.Join(dir, m))
-		if errors.Is(err, os.ErrNotExist) {
-			return false, nil
-		}
-		if err != nil {
-			return false, err
-		}
-		if st.Size() == 0 {
-			return false, nil
-		}
+// place puts the verified extraction tmp at dir, unless another owfeed has put one
+// there that passes checkCache meanwhile.
+//
+// What dir held failed its check, and goes only now, so a failed download leaves the
+// cache as it found it. Owfeeds that share a cache take turns under a lock: each one
+// found the cache stale before the others replaced it, and without the lock removed
+// or moved aside a copy that another had just verified and returned. Run as 8
+// concurrent Acquires over one stale cache, 28 of 240 failed that way, as exit 7.
+// The stale copy is renamed aside, not removed in place, so that dir is missing only
+// between two renames and not for as long as RemoveAll takes.
+func place(tmp, dir string) error {
+	lock, err := os.OpenFile(dir+".lock", os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		return err
 	}
-	return true, nil
+	defer lock.Close() // which releases the flock
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		return fmt.Errorf("locking %s, so that runs sharing the cache replace it one at a time: %w; "+
+			"put the cache on a filesystem that supports flock(2) with --cache", lock.Name(), err)
+	}
+	if checkCache(dir) == nil {
+		return nil
+	}
+	aside := tmp + ".stale"
+	if err := os.Rename(dir, aside); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("moving the cached SDK at %s aside to replace it: %w; delete that directory and run again", dir, err)
+	}
+	defer os.RemoveAll(aside)
+	return os.Rename(tmp, dir)
 }
 
-// verifiedChecksums fetches sha256sums and returns it only if its detached usign
-// signature verifies under a pinned key. Every failure path here returns an error;
-// there is no mode in which an unverified list is used.
-func verifiedChecksums(ctx context.Context, hc *http.Client, base string) ([]byte, error) {
-	sums, err := fetch(ctx, hc, base+"/sha256sums")
-	if err != nil {
-		return nil, err
+// pointRE is the shape of a release Acquire accepts. The name becomes a directory
+// under the cache that Acquire may delete, so "../.." must never get that far.
+var pointRE = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?$`)
+
+// The record Acquire keeps beside an extraction: the signed list exactly as OpenWrt
+// serves it, which names the sha256 the tarball was verified against, the key it was
+// verified with, and the hash of every member as it came out of that tarball. A
+// person can check it by hand in that directory with
+// `usign -V -m sha256sums -p sha256sums.pub` and `sha256sum -c members.sha256`.
+const (
+	sumsFile    = "sha256sums"
+	sigFile     = "sha256sums.sig"
+	keyFile     = "sha256sums.pub"
+	membersFile = "members.sha256"
+)
+
+// checkCache returns nil when dir holds an extraction that this binary would publish
+// today, and says why not otherwise.
+//
+// Until it existed a cached SDK was trusted for being there: six non-empty files. A
+// truncated or replaced .apk.bin passed, and so did an extraction verified with a key
+// that a later owfeed no longer pins. Now the stored sha256sums has to verify under a
+// key pinned in this binary and name one SDK tarball, and every member has to hash to
+// what members.sha256 recorded when it came out of that tarball. Nothing here reaches
+// the network, so --no-network keeps working.
+//
+// shortcut: members.sha256 is owfeed's record, not OpenWrt's signature, so whoever can
+// write the cache can rewrite it to match. This catches a damaged or stale cache, not
+// a planted one: a cache saved by a less trusted job (one that runs `npm ci`, say) is
+// still not safe to restore into a job that holds a signing key. Keeping the 285 MB
+// tarball and hashing it against the signed list on every use would make it safe;
+// do that when such a restore is wanted.
+func checkCache(dir string) error {
+	var rec [3][]byte
+	for i, name := range []string{sumsFile, sigFile, keyFile} {
+		b, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			return err
+		}
+		rec[i] = b
 	}
-	sigBytes, err := fetch(ctx, hc, base+"/sha256sums.sig")
-	if err != nil {
-		return nil, err
+	sums, sig, key := rec[0], rec[1], rec[2]
+	if err := verifySums(dir, sums, sig, key); err != nil {
+		return err
+	}
+	if _, _, err := findSDK(sums); err != nil {
+		return fmt.Errorf("%s: %w", dir, err)
 	}
 
+	recorded, err := os.ReadFile(filepath.Join(dir, membersFile))
+	if err != nil {
+		return err
+	}
+	want := map[string]string{}
+	for _, line := range strings.Split(strings.TrimSuffix(string(recorded), "\n"), "\n") {
+		hash, member, ok := strings.Cut(line, "  ")
+		if !ok {
+			return fmt.Errorf("%s: %q is not a sha256sum line", filepath.Join(dir, membersFile), line)
+		}
+		want[member] = hash
+	}
+	if len(want) != len(sdkMembers) {
+		return fmt.Errorf("%s lists %d files, the extraction has %d", filepath.Join(dir, membersFile), len(want), len(sdkMembers))
+	}
+	for _, m := range sdkMembers {
+		got, err := hashFile(filepath.Join(dir, filepath.FromSlash(m)))
+		if err != nil {
+			return err
+		}
+		if got != want[m] {
+			return fmt.Errorf("%s hashes to %s, %s recorded %s when it was extracted",
+				filepath.Join(dir, filepath.FromSlash(m)), got, membersFile, want[m])
+		}
+	}
+	return nil
+}
+
+// writeRecord stores beside a fresh extraction in dir what checkCache reads back.
+func writeRecord(dir string, sums, sig, key []byte) error {
+	var members bytes.Buffer
+	for _, m := range sdkMembers {
+		h, err := hashFile(filepath.Join(dir, filepath.FromSlash(m)))
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(&members, "%s  %s\n", h, m)
+	}
+	for name, b := range map[string][]byte{sumsFile: sums, sigFile: sig, keyFile: key, membersFile: members.Bytes()} {
+		if err := os.WriteFile(filepath.Join(dir, name), b, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func hashFile(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", fmt.Errorf("reading %s: %w", path, err)
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// verifiedChecksums fetches sha256sums, its detached usign signature and the key that
+// signature names, and returns all three only if the signature verifies under a pinned
+// key. Every failure path here returns an error; there is no mode in which an
+// unverified list is used.
+func verifiedChecksums(ctx context.Context, hc *http.Client, base string) (sums, sig, key []byte, err error) {
+	if sums, err = fetch(ctx, hc, base+"/sha256sums"); err != nil {
+		return nil, nil, nil, err
+	}
+	if sig, err = fetch(ctx, hc, base+"/sha256sums.sig"); err != nil {
+		return nil, nil, nil, err
+	}
+	// Checked before the key is fetched, so that an id nobody pinned is refused
+	// without a request built from it.
+	_, id, err := pinnedSigner(sig)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if key, err = fetch(ctx, hc, fmt.Sprintf(keyringURLTemplate, keyringCommit, id)); err != nil {
+		return nil, nil, nil, fmt.Errorf("fetching key %s from openwrt/keyring: %w", id, err)
+	}
+	if err := verifySums(base, sums, sig, key); err != nil {
+		return nil, nil, nil, err
+	}
+	return sums, sig, key, nil
+}
+
+// pinnedSigner parses sha256sums.sig and returns the key id it names, if that id is
+// pinned in trustedKeys.
+func pinnedSigner(sigBytes []byte) (*usign.Signature, string, error) {
 	sig, err := usign.ParseSignature(sigBytes)
 	if err != nil {
-		return nil, fmt.Errorf("sha256sums.sig: %w", err)
+		return nil, "", fmt.Errorf("sha256sums.sig: %w", err)
 	}
-
 	id := sig.ID.String()
-	wantKeyHash, ok := trustedKeys[id]
-	if !ok {
-		return nil, fmt.Errorf("sha256sums is signed by key %s, which is not pinned in owfeed. "+
+	if _, ok := trustedKeys[id]; !ok {
+		return nil, "", fmt.Errorf("sha256sums is signed by key %s, which is not pinned in owfeed. "+
 			"If OpenWrt rotated its branch key this is expected — verify the new key out of band "+
 			"and add it to internal/apk/pin.go", id)
 	}
+	return sig, id, nil
+}
 
-	keyBytes, err := fetch(ctx, hc, fmt.Sprintf(keyringURLTemplate, keyringCommit, id))
+// verifySums checks sigBytes over sums with keyBytes, whose hash has to be the one
+// pinned for the key id the signature names. from says where sums came from.
+func verifySums(from string, sums, sigBytes, keyBytes []byte) error {
+	sig, id, err := pinnedSigner(sigBytes)
 	if err != nil {
-		return nil, fmt.Errorf("fetching key %s from openwrt/keyring: %w", id, err)
+		return err
 	}
-	if got := sha256hex(keyBytes); got != wantKeyHash {
-		return nil, fmt.Errorf("openwrt/keyring key %s hashes to %s, pinned value is %s — "+
-			"refusing to verify anything with it", id, got, wantKeyHash)
+	if got, want := sha256hex(keyBytes), trustedKeys[id]; got != want {
+		return fmt.Errorf("openwrt/keyring key %s hashes to %s, pinned value is %s — "+
+			"refusing to verify anything with it", id, got, want)
 	}
-
 	pub, err := usign.ParsePublicKey(keyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("openwrt/keyring key %s: %w", id, err)
+		return fmt.Errorf("openwrt/keyring key %s: %w", id, err)
 	}
 	if err := usign.Verify(pub, sig, sums); err != nil {
-		return nil, fmt.Errorf("sha256sums from %s: %w", base, err)
+		return fmt.Errorf("sha256sums from %s: %w", from, err)
 	}
-	return sums, nil
+	return nil
 }
 
 // sdkLine matches the SDK entry in a sha256sums file. The toolchain version is part
@@ -170,22 +327,18 @@ func findSDK(sums []byte) (name, hash string, err error) {
 // into the member extractor, so the 285 MB archive is never written to disk. The
 // hash is checked after the stream is fully consumed; the caller keeps the output in
 // a temporary directory until then.
+//
+// netx.Get picks a broken download up where it stopped, below the hash, so the hash
+// still covers every byte once and in order.
 func downloadAndExtract(ctx context.Context, hc *http.Client, url, wantHash, dest string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	body, err := netx.Get(ctx, hc, url)
 	if err != nil {
 		return err
 	}
-	resp, err := hc.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return netx.Status(url, resp)
-	}
+	defer body.Close()
 
 	hasher := sha256.New()
-	zr, err := zstd.NewReader(io.TeeReader(resp.Body, hasher))
+	zr, err := zstd.NewReader(io.TeeReader(body, hasher))
 	if err != nil {
 		return err
 	}
@@ -271,19 +424,12 @@ func extractMembers(tr *tar.Reader, dest string) error {
 }
 
 func fetch(ctx context.Context, hc *http.Client, url string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	body, err := netx.Get(ctx, hc, url)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := hc.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, netx.Status(url, resp)
-	}
-	return io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+	defer body.Close()
+	return io.ReadAll(io.LimitReader(body, 8<<20))
 }
 
 func sha256hex(b []byte) string {

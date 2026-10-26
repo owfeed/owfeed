@@ -74,7 +74,8 @@ func Transient(err error) bool {
 	}
 	var oe *outageError
 	var transportOutage *OutageError
-	if errors.As(err, &oe) || errors.As(err, &transportOutage) {
+	var stalled *StalledError
+	if errors.As(err, &oe) || errors.As(err, &transportOutage) || errors.As(err, &stalled) {
 		return true
 	}
 	var se *StatusError
@@ -110,23 +111,41 @@ func Transient(err error) bool {
 // that doubles between attempts. Anything with a body is passed through untouched:
 // replaying a write is not this package's decision to make.
 //
-// Only the response headers are covered. A body that breaks off halfway -- the
+// Every attempt is abandoned as stalled when nothing arrives for Idle: neither the
+// response headers nor, later, the next byte of the body.
+//
+// Only the response headers are retried here. A body that breaks off halfway -- the
 // 285 MB SDK -- is returned to the caller as a read error, which Transient still
-// classifies as an outage.
+// classifies as an outage, and which Get picks up from where it stopped.
 type Transport struct {
 	Base     http.RoundTripper
 	Attempts int           // default DefaultAttempts
 	Delay    time.Duration // before the second attempt; default DefaultDelay
+	Idle     time.Duration // default DefaultIdle
 }
 
 // Four attempts, 2 s, 4 s and 8 s apart: 14 s of waiting covers a CDN hiccup without
 // holding a job for minutes on a real incident, which exit 8 then reports.
 //
+// A minute with nothing arriving is not a slow mirror. Before DefaultIdle, a server
+// that kept the connection open and sent nothing held the command until CI killed
+// the job: http.DefaultClient has no deadline.
+//
 // Variables so that tests can make the same number of attempts without the waiting.
 var (
 	DefaultAttempts = 4
 	DefaultDelay    = 2 * time.Second
+	DefaultIdle     = 60 * time.Second
 )
+
+// StalledError is a request that received nothing for its idle deadline.
+type StalledError struct {
+	Idle time.Duration
+}
+
+func (e *StalledError) Error() string {
+	return fmt.Sprintf("nothing received for %s", e.Idle)
+}
 
 // OutageError is what Transport returns when a transient transport failure outlasted
 // every attempt.
@@ -149,16 +168,19 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		(req.Body != nil && req.Body != http.NoBody) {
 		return base.RoundTrip(req)
 	}
-	attempts, delay := t.Attempts, t.Delay
+	attempts, delay, idle := t.Attempts, t.Delay, t.Idle
 	if attempts <= 0 {
 		attempts = DefaultAttempts
 	}
 	if delay <= 0 {
 		delay = DefaultDelay
 	}
+	if idle <= 0 {
+		idle = DefaultIdle
+	}
 
 	for attempt := 1; ; attempt++ {
-		resp, err := base.RoundTrip(req)
+		resp, err := once(base, req, idle)
 		retry := false
 		switch {
 		case err != nil:
@@ -181,14 +203,71 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 			resp.Body.Close()
 		}
-		timer := time.NewTimer(delay)
-		select {
-		case <-req.Context().Done():
-			timer.Stop()
-			return nil, req.Context().Err()
-		case <-timer.C:
+		if err := pause(req.Context(), delay); err != nil {
+			return nil, err
 		}
 		delay *= 2
+	}
+}
+
+// once makes one attempt and abandons it when nothing arrives for idle: while it
+// waits for the headers, and inside each Read of the body. The clock runs only while
+// a Read is waiting, so a caller that pauses between reads is not counted against it.
+func once(base http.RoundTripper, req *http.Request, idle time.Duration) (*http.Response, error) {
+	ctx, cancel := context.WithCancelCause(req.Context())
+	stalled := &StalledError{Idle: idle}
+	timer := time.AfterFunc(idle, func() { cancel(stalled) })
+	resp, err := base.RoundTrip(req.WithContext(ctx))
+	timer.Stop()
+	if err != nil {
+		cancel(nil)
+		if errors.Is(context.Cause(ctx), stalled) {
+			return nil, stalled
+		}
+		return nil, err
+	}
+	resp.Body = &idleBody{body: resp.Body, ctx: ctx, cancel: cancel, timer: timer, idle: idle, stalled: stalled}
+	return resp, nil
+}
+
+// idleBody is a response body whose every Read has to receive something within idle.
+type idleBody struct {
+	body    io.ReadCloser
+	ctx     context.Context
+	cancel  context.CancelCauseFunc
+	timer   *time.Timer
+	idle    time.Duration
+	stalled *StalledError
+}
+
+func (b *idleBody) Read(p []byte) (int, error) {
+	b.timer.Reset(b.idle)
+	n, err := b.body.Read(p)
+	b.timer.Stop()
+	// The transport reports the cancellation in words of its own, which differ
+	// between HTTP/1 and HTTP/2; the cause is what says it was the deadline.
+	if err != nil && !errors.Is(err, io.EOF) && errors.Is(context.Cause(b.ctx), b.stalled) {
+		return n, b.stalled
+	}
+	return n, err
+}
+
+func (b *idleBody) Close() error {
+	b.timer.Stop()
+	err := b.body.Close()
+	b.cancel(nil)
+	return err
+}
+
+// pause waits for d, or returns early with the context's error.
+func pause(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
 	}
 }
 
@@ -200,4 +279,136 @@ func Client(hc *http.Client) *http.Client {
 	c := *hc
 	c.Transport = &Transport{Base: hc.Transport}
 	return &c
+}
+
+// Get returns the body of a GET of url, which has to answer 200 OK.
+//
+// A body that stalls or breaks off is asked for again from the byte it stopped at, so
+// a connection lost 280 MB into the 285 MB SDK costs the last 5 MB rather than the
+// whole download, and the reader never sees the break. Get gives up with an
+// OutageError after DefaultAttempts breaks with nothing received between them.
+//
+// Nothing here proves that the pieces are one file. downloads.openwrt.org ignores
+// If-Range (measured in docs/apk-behaviour.md), so a file replaced between two
+// requests would arrive spliced; the caller hashes what it read against a signed
+// list, and that is the check that catches it.
+func Get(ctx context.Context, hc *http.Client, url string) (io.ReadCloser, error) {
+	resp, err := get(ctx, hc, url, 0)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, Status(url, resp)
+	}
+	return &resumable{ctx: ctx, hc: hc, url: url, body: resp.Body, delay: DefaultDelay}, nil
+}
+
+func get(ctx context.Context, hc *http.Client, url string, from int64) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	// Left to itself Go asks for gzip and decodes it, and a count of decoded bytes is
+	// not an offset into the file that a Range header names.
+	req.Header.Set("Accept-Encoding", "identity")
+	if from > 0 {
+		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", from))
+	}
+	return hc.Do(req)
+}
+
+// resumable is the body Get returns.
+type resumable struct {
+	ctx   context.Context
+	hc    *http.Client
+	url   string
+	body  io.ReadCloser
+	read  int64 // bytes handed to the reader so far
+	tries int   // breaks since a byte last arrived
+	delay time.Duration
+}
+
+func (r *resumable) Read(p []byte) (int, error) {
+	for {
+		n, err := r.body.Read(p)
+		r.read += int64(n)
+		if n > 0 {
+			r.tries, r.delay = 0, DefaultDelay
+		}
+		if err == nil || errors.Is(err, io.EOF) {
+			return n, err
+		}
+		if err := r.resume(err); err != nil {
+			return n, err
+		}
+		if n > 0 {
+			return n, nil
+		}
+	}
+}
+
+func (r *resumable) Close() error { return r.body.Close() }
+
+// resume replaces a body that failed with cause by one that starts at byte r.read.
+func (r *resumable) resume(cause error) error {
+	for {
+		if !Transient(cause) {
+			return cause
+		}
+		r.tries++
+		if r.tries >= DefaultAttempts {
+			return &OutageError{Attempts: r.tries, Err: fmt.Errorf("GET %s: broke off at byte %d: %w", r.url, r.read, cause)}
+		}
+		r.body.Close()
+		if err := pause(r.ctx, r.delay); err != nil {
+			return err
+		}
+		r.delay *= 2
+
+		// Through the same client, so the request for the rest is retried and
+		// bounded like the first one; an error here has outlasted that already.
+		resp, err := get(r.ctx, r.hc, r.url, r.read)
+		if err != nil {
+			// The cause as text only: it is an outage, and wrapping it would make
+			// Transient call err one too when err is an answer.
+			return fmt.Errorf("resuming at byte %d after %s: %w", r.read, cause.Error(), err)
+		}
+		switch resp.StatusCode {
+		case http.StatusPartialContent:
+			var start int64
+			cr := resp.Header.Get("Content-Range")
+			if _, err := fmt.Sscanf(cr, "bytes %d-", &start); err != nil || start != r.read {
+				resp.Body.Close()
+				return fmt.Errorf("GET %s from byte %d: the server sent Content-Range %q", r.url, r.read, cr)
+			}
+			r.body = resp.Body
+			return nil
+		case http.StatusOK:
+			// The server ignored Range and starts from byte 0 again: what was read
+			// already is read once more and dropped.
+			r.body = resp.Body
+			if _, err := io.CopyN(io.Discard, resp.Body, r.read); err != nil {
+				cause = err
+				continue
+			}
+			return nil
+		case http.StatusRequestedRangeNotSatisfiable:
+			// The break came after the last byte, before the end of the response
+			// (a chunked body without its closing chunk). Asked for the rest, the
+			// server gives the file's size, `bytes */284842599` in
+			// docs/apk-behaviour.md; when that is what was read, nothing is missing.
+			var size int64
+			cr := resp.Header.Get("Content-Range")
+			resp.Body.Close()
+			if _, err := fmt.Sscanf(cr, "bytes */%d", &size); err != nil || size != r.read {
+				return fmt.Errorf("GET %s from byte %d: the server sent %s, Content-Range %q", r.url, r.read, resp.Status, cr)
+			}
+			r.body = http.NoBody
+			return nil
+		default:
+			resp.Body.Close()
+			return Status(r.url, resp)
+		}
+	}
 }

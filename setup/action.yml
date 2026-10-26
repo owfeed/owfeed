@@ -61,23 +61,73 @@ runs:
         # (<url>)` or `(HTTP 503)`, an unreachable host `error connecting to <host>`,
         # an unreachable proxy `proxyconnect tcp: ... connection refused`, and
         # `gh attestation verify` with no Sigstore trust root reachable `error
-        # creating Sigstore verifier`. An answer prints `release not found`, `no assets
-        # match the file pattern` or `HTTP 404`.
+        # creating Sigstore verifier`. Measured with gh 2.103.2, an API request that
+        # gets no answer gives up after 60 s with `context deadline exceeded`; and
+        # `no answer within` is what gh_deadline below says when it stops gh. An
+        # answer prints `release not found`, `no assets match the file pattern` or
+        # `HTTP 404`.
         gh_outage() {
-          grep -Eqi 'HTTP (408|429|5[0-9][0-9])|status code: (408|429|5[0-9][0-9])|error connecting to|connection (refused|reset)|i/o timeout|TLS handshake timeout|timeout awaiting|no such host|unexpected EOF|server misbehaving|proxyconnect|rate limit|error creating Sigstore verifier' <<<"$1"
+          grep -Eqi 'HTTP (408|429|5[0-9][0-9])|status code: (408|429|5[0-9][0-9])|error connecting to|connection (refused|reset)|i/o timeout|TLS handshake timeout|timeout awaiting|context deadline exceeded|no answer within|no such host|unexpected EOF|server misbehaving|proxyconnect|rate limit|error creating Sigstore verifier' <<<"$1"
+        }
+
+        # gh_deadline <gh arguments>
+        #
+        # Runs gh and stops it after GH_DEADLINE seconds. Measured with gh 2.103.2
+        # against a proxy that accepts the connection and sends nothing: `gh release
+        # view` and `gh release download` give up after 60 s, and `gh attestation
+        # verify` was still waiting when it was killed at 90 s. Unbounded, that held
+        # the step until the job's own timeout, six hours unless the caller set one,
+        # and the retries never had their turn. On a stop it says so on stderr, where
+        # gh_outage reads it, and returns 124. Not timeout(1): that is GNU coreutils,
+        # which macOS does not ship and the macOS runner images do not list.
+        GH_DEADLINE=120
+        gh_deadline() {
+          local pid dog rc=0 stopped
+          stopped="$(mktemp)"
+          gh "$@" &
+          pid=$!
+          # Polls, rather than one long sleep, so that it is gone within a second
+          # of gh. Its output goes to /dev/null because inside $(...) a process that
+          # still holds the pipe makes the substitution wait for it. It marks the
+          # stop in a file before it signals gh: an exit code of its own came too
+          # late, because gh could die and be waited for, and the watchdog be
+          # killed, before it reached that exit. Under load 2 of 15 test runs read
+          # such a stop as an answer: exit 7, or "does not verify".
+          (
+            i=0
+            while [ "$i" -lt "$GH_DEADLINE" ]; do
+              sleep 1
+              kill -0 "$pid" 2>/dev/null || exit 0
+              i=$((i + 1))
+            done
+            echo stopped >"$stopped"
+            kill -TERM "$pid" 2>/dev/null
+          ) >/dev/null 2>&1 &
+          dog=$!
+          wait "$pid" || rc=$?
+          kill "$dog" 2>/dev/null || true
+          wait "$dog" 2>/dev/null || true
+          if [ "$rc" -ne 0 ] && [ -s "$stopped" ]; then
+            rm -f "$stopped"
+            echo "gh $1 $2: no answer within ${GH_DEADLINE}s; stopped it" >&2
+            return 124
+          fi
+          rm -f "$stopped"
+          return "$rc"
         }
 
         # gh_read <gh arguments>
         #
         # A read from GitHub, asked again while GitHub is failing: 4 attempts, 5, 10
-        # and 20 s apart. Exit 8 when the outage outlasts them -- owfeed's "upstream
-        # outage, safe to rerun" -- and 7 at once for an answer. Before this one 502
-        # failed the step with gh's exit 1, the same as a tag that does not exist.
+        # and 20 s apart, each stopped after GH_DEADLINE seconds. Exit 8 when the
+        # outage outlasts them -- owfeed's "upstream outage, safe to rerun" -- and 7 at
+        # once for an answer. Before this one 502 failed the step with gh's exit 1,
+        # the same as a tag that does not exist.
         gh_read() {
           local attempt=1 delay=5 err
           err="$(mktemp)"
           while :; do
-            if gh "$@" 2>"$err"; then
+            if gh_deadline "$@" 2>"$err"; then
               rm -f "$err"
               return 0
             fi
@@ -173,11 +223,12 @@ runs:
           #
           # Asked again when GitHub's attestation API or Sigstore is what failed:
           # reporting that as "does not verify" said the binary was suspect when the
-          # check had never run, and pushed people towards verify: false.
+          # check had never run, and pushed people towards verify: false. Each
+          # attempt is stopped after GH_DEADLINE seconds, like every gh call here.
           attempt=1
           delay=5
           while :; do
-            if out=$(gh attestation verify "$dir/$asset" \
+            if out=$(gh_deadline attestation verify "$dir/$asset" \
                 --repo owfeed/owfeed \
                 --signer-workflow owfeed/owfeed/.github/workflows/release.yml 2>&1); then
               echo "$out"
