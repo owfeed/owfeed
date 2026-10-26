@@ -393,6 +393,19 @@ func (r *resumable) resume(cause error) error {
 				continue
 			}
 			return nil
+		case http.StatusRequestedRangeNotSatisfiable:
+			// The break came after the last byte, before the end of the response
+			// (a chunked body without its closing chunk). Asked for the rest, the
+			// server gives the file's size, `bytes */284842599` in
+			// docs/apk-behaviour.md; when that is what was read, nothing is missing.
+			var size int64
+			cr := resp.Header.Get("Content-Range")
+			resp.Body.Close()
+			if _, err := fmt.Sscanf(cr, "bytes */%d", &size); err != nil || size != r.read {
+				return fmt.Errorf("GET %s from byte %d: the server sent %s, Content-Range %q", r.url, r.read, resp.Status, cr)
+			}
+			r.body = http.NoBody
+			return nil
 		default:
 			resp.Body.Close()
 			return Status(r.url, resp)

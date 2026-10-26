@@ -477,3 +477,54 @@ func TestGetStopsWhenTheContextIsCancelled(t *testing.T) {
 		t.Fatalf("want context.Canceled, not an outage; got %v", err)
 	}
 }
+
+// A body can break after its last byte: chunked, with the closing chunk never sent.
+// The request for the rest then starts at the end of the file, and the server answers
+// 416 with the file's size, which is all of it. A 416 that names another size is a
+// file that changed, and still an error.
+func TestGetFinishesABodyThatBrokeAfterItsLastByte(t *testing.T) {
+	for name, c := range map[string]struct {
+		size    int
+		wantErr bool
+	}{
+		"the size that was read": {len(payload), false},
+		"another size":           {len(payload) + 1, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var mu sync.Mutex
+			var ranges []string
+			s := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				ranges = append(ranges, r.Header.Get("Range"))
+				n := len(ranges)
+				mu.Unlock()
+				if n == 1 {
+					fmt.Fprint(w, payload)
+					w.(http.Flusher).Flush()
+					conn, _, err := w.(http.Hijacker).Hijack()
+					if err != nil {
+						t.Error(err)
+						return
+					}
+					conn.Close()
+					return
+				}
+				w.Header().Set("Content-Range", fmt.Sprintf("bytes */%d", c.size))
+				w.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
+			})
+			got, err := readGet(t, s.URL)
+			if want := []string{"", fmt.Sprintf("bytes=%d-", len(payload))}; fmt.Sprint(ranges) != fmt.Sprint(want) {
+				t.Fatalf("requests with Range %q, want %q", ranges, want)
+			}
+			if c.wantErr {
+				if err == nil || Transient(err) || !strings.Contains(err.Error(), "416") {
+					t.Fatalf("read %d bytes, %v; want a 416 that is an answer", len(got), err)
+				}
+				return
+			}
+			if err != nil || got != payload {
+				t.Fatalf("read %d bytes, %v; want %d and no error", len(got), err, len(payload))
+			}
+		})
+	}
+}
