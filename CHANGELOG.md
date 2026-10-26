@@ -2,6 +2,31 @@
 
 Dates are when the tag was cut. Anything not listed is documentation or tests.
 
+## Unreleased
+
+- **Fixed:** a `package.yml` run over a tag whose release is already published re-checks
+  that release and signs nothing. It used to sign again, and `adbsign`'s ECDSA signature
+  is randomised: one package signed twice with one key came out as `2966590e…` and then
+  `8cfc4085…`. The upload then deleted each live asset before putting the new one up, so
+  a router installing in between met a 404, or a package whose sha256 the manifest did
+  not list. "Re-run all jobs" on a tag run and a `workflow_dispatch` at a tag both did
+  this. Now the job downloads the published release, verifies it with `verify-with`,
+  checks it against its manifest and checks `latest/download` again. A draft that a
+  failed attempt left is signed and published as before. So is a published release
+  that holds no `manifest.txt`, which this workflow did not finish, with a warning. To
+  publish a tag anew, delete its release first; the tag stays.
+- **Fixed:** the `package.yml` job stops after 30 minutes. It had GitHub's default of
+  six hours, and a caller cannot set `timeout-minutes` on a job that `uses:` a workflow.
+- **Fixed:** `package.yml` retries what one blip used to turn red. `owfeed sign` is run
+  again on exit 8 only, three attempts 30 and 60 s apart; any other code fails at once.
+  `gh release edit --draft=false` gets four attempts, so one 5xx no longer leaves a
+  finished draft unpublished. The `latest/download` check waits up to two minutes for
+  the new manifest instead of failing on the first 404 or on the previous release's
+  manifest, and each fetch is bounded by `--connect-timeout 10 --max-time 20`.
+- **Added:** `package.yml` checks, on every release, that the manifest names the
+  repository and the tag, and that each file it lists is there with that size and
+  sha256, before anything is uploaded.
+
 ## v0.5.5 — 2026-10-13
 
 - **Added:** `compression: zopfli` on a package writes its deflate streams with zopfli:
