@@ -9,11 +9,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 
 	"github.com/klauspost/compress/zstd"
 
@@ -36,7 +38,7 @@ import (
 // A cached extraction is used only while checkCache passes. One that does not -- from
 // an owfeed that kept no record, or changed since -- is fetched again, and replaced
 // only once the new extraction has passed every check.
-func Acquire(ctx context.Context, hc *http.Client, cacheRoot, pointRelease string) (string, error) {
+func Acquire(ctx context.Context, hc *http.Client, cacheRoot, pointRelease string) (_ string, err error) {
 	if !pointRE.MatchString(pointRelease) {
 		return "", fmt.Errorf("SDK release %q is not a point release such as 25.12.5; "+
 			"set one as sdk-release in owfeed.lock (`owfeed lock --update` writes it) or pass --sdk-release", pointRelease)
@@ -45,6 +47,17 @@ func Acquire(ctx context.Context, hc *http.Client, cacheRoot, pointRelease strin
 	stale := checkCache(dir)
 	if stale == nil {
 		return dir, nil
+	}
+	// Without this a run offline -- the first after upgrading from an owfeed that kept
+	// no record -- fails on a request it had no visible reason to make, beside a
+	// cache the user can see.
+	if _, statErr := os.Stat(dir); statErr == nil {
+		defer func() {
+			if err != nil {
+				// stale as text: the fetch's error alone decides outage or answer.
+				err = fmt.Errorf("%w\n  the cached SDK at %s fails its check, so it is fetched again: %s", err, dir, stale.Error())
+			}
+		}()
 	}
 
 	base := fmt.Sprintf("https://downloads.openwrt.org/releases/%s/targets/%s", pointRelease, sdkTarget)
@@ -77,23 +90,41 @@ func Acquire(ctx context.Context, hc *http.Client, cacheRoot, pointRelease strin
 	if err := writeRecord(tmp, sums, sig, key); err != nil {
 		return "", err
 	}
-	if err := os.Rename(tmp, dir); err != nil {
-		// A concurrent owfeed may have won the race and populated the cache; if the
-		// destination now passes the check, that is a success, not a conflict.
-		if checkCache(dir) == nil {
-			return dir, nil
-		}
-		// What is there is the extraction that failed its check above. It goes only
-		// now, so a failed download leaves the cache as it found it.
-		if rmErr := os.RemoveAll(dir); rmErr != nil {
-			return "", fmt.Errorf("replacing the cached SDK at %s, which failed its check (%v): %w; "+
-				"delete that directory and run again", dir, stale, rmErr)
-		}
-		if err := os.Rename(tmp, dir); err != nil {
-			return "", err
-		}
+	if err := place(tmp, dir); err != nil {
+		return "", err
 	}
 	return dir, nil
+}
+
+// place puts the verified extraction tmp at dir, unless another owfeed has put one
+// there that passes checkCache meanwhile.
+//
+// What dir held failed its check, and goes only now, so a failed download leaves the
+// cache as it found it. Owfeeds that share a cache take turns under a lock: each one
+// found the cache stale before the others replaced it, and without the lock removed
+// or moved aside a copy that another had just verified and returned. Run as 8
+// concurrent Acquires over one stale cache, 28 of 240 failed that way, as exit 7.
+// The stale copy is renamed aside, not removed in place, so that dir is missing only
+// between two renames and not for as long as RemoveAll takes.
+func place(tmp, dir string) error {
+	lock, err := os.OpenFile(dir+".lock", os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		return err
+	}
+	defer lock.Close() // which releases the flock
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		return fmt.Errorf("locking %s, so that runs sharing the cache replace it one at a time: %w; "+
+			"put the cache on a filesystem that supports flock(2) with --cache", lock.Name(), err)
+	}
+	if checkCache(dir) == nil {
+		return nil
+	}
+	aside := tmp + ".stale"
+	if err := os.Rename(dir, aside); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("moving the cached SDK at %s aside to replace it: %w; delete that directory and run again", dir, err)
+	}
+	defer os.RemoveAll(aside)
+	return os.Rename(tmp, dir)
 }
 
 // pointRE is the shape of a release Acquire accepts. The name becomes a directory

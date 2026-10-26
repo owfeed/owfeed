@@ -327,11 +327,56 @@ func TestAcquireKeepsTheOldCacheWhenTheReplacementFails(t *testing.T) {
 	}
 	u.stall = func(int) int { return len(u.tarball) / 2 }
 
-	if _, err := acquire(t, hc, cache); !netx.Transient(err) {
+	_, err = acquire(t, hc, cache)
+	if !netx.Transient(err) {
 		t.Fatalf("Acquire = %v, want an outage", err)
+	}
+	// Offline, this is the first run after upgrading from an owfeed that kept no
+	// record, and the error has to say why the cache there was not enough.
+	if want := "the cached SDK at " + dir + " fails its check, so it is fetched again: "; !strings.Contains(err.Error(), want) {
+		t.Fatalf("the error does not say %q: %v", want, err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(binPath))); err != nil {
 		t.Fatalf("a failed download removed the extraction it was replacing: %v", err)
+	}
+}
+
+// Parallel runs that share one cache all find the same stale extraction and all
+// replace it. Each has to end with a verified cache and no error, as they did when the
+// cache was only ever filled, never replaced.
+func TestAcquireReplacesAStaleCacheAlongsideAnotherOwfeed(t *testing.T) {
+	_, hc := newUpstream(t)
+	cache := t.TempDir()
+	dir, err := acquire(t, hc, cache)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for round := 0; round < 10; round++ {
+		if err := os.Remove(filepath.Join(dir, membersFile)); err != nil {
+			t.Fatal(err)
+		}
+		var wg sync.WaitGroup
+		errs := make([]error, 8)
+		for i := range errs {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_, errs[i] = Acquire(context.Background(), hc, cache, testRelease)
+			}()
+		}
+		wg.Wait()
+		for _, err := range errs {
+			if err != nil {
+				t.Errorf("round %d: %v", round, err)
+			}
+		}
+		if err := checkCache(dir); err != nil {
+			t.Fatalf("round %d: %v", round, err)
+		}
+	}
+	entries, err := os.ReadDir(filepath.Join(cache, "sdk"))
+	if err != nil || len(entries) != 2 {
+		t.Fatalf("the cache holds %v, %v; want only %s and its lock", entries, err, testRelease)
 	}
 }
 
@@ -396,6 +441,9 @@ func TestAcquireGivesUpOnADownloadThatStaysStalled(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), u.name) || !strings.Contains(err.Error(), fmt.Sprintf("broke off at byte %d", half)) {
 		t.Fatalf("the error should name the file and where it stopped: %v", err)
+	}
+	if strings.Contains(err.Error(), "cached SDK") {
+		t.Fatalf("there was no cache to speak of: %v", err)
 	}
 	if len(u.requests) != netx.DefaultAttempts {
 		t.Fatalf("%d tarball requests, want %d", len(u.requests), netx.DefaultAttempts)

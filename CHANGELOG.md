@@ -22,13 +22,15 @@ Dates are when the tag was cut. Anything not listed is documentation or tests.
   and the SHA-256 of each extracted file. The signature has to verify under a key
   pinned in this binary, and every file has to match. Before, six non-empty files were
   enough, so a truncated `.apk.bin` passed. A cache that fails is fetched again, and
-  replaced only once the new copy has verified. This catches a damaged or stale cache,
-  not a planted one: whoever can write the cache can rewrite the record, so a cache
-  saved by a less trusted job is still not safe to restore into a job that holds a
-  signing key. Caches written by 0.5.5 and earlier have no record, so the first run
-  after upgrading fetches the SDK again. In CI, add the owfeed version to the cache
-  key: a key that names only `owfeed.lock` restores the old cache as a hit, which
-  `actions/cache` does not save over, so every run would fetch the SDK.
+  replaced only once the new copy has verified. Runs that share a cache replace it one
+  at a time, under a lock on `sdk/<release>.lock` beside it; a run that fails while
+  fetching says that the cache there failed its check, and why. This catches a damaged
+  or stale cache, not a planted one: whoever can write the cache can rewrite the
+  record, so a cache saved by a less trusted job is still not safe to restore into a
+  job that holds a signing key. Caches written by 0.5.5 and earlier have no record, so
+  the first run after upgrading fetches the SDK again. In CI, add the owfeed version to
+  the cache key: a key that names only `owfeed.lock` restores the old cache as a hit,
+  which `actions/cache` does not save over, so every run would fetch the SDK.
 - **Fixed:** an SDK release that is not a point release, such as `SNAPSHOT` or `../..`
   in `--sdk-release`, is refused before anything is fetched or removed.
 - **Fixed:** `owfeed/owfeed/setup` stops each `gh` call after 120 s, and retries it as
