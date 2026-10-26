@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -105,6 +106,7 @@ func (w *workspace) run(step string, env ...string) stepRun {
 type workflowStep struct {
 	ID, Name, If, Uses, Run string
 	Env                     map[string]string
+	With                    map[string]any
 }
 
 type workflowJob struct {
@@ -217,6 +219,40 @@ func TestPackageRunsOncePerTag(t *testing.T) {
 	}
 	if c.CancelInProgress {
 		t.Error("the release job cancels a run in progress, which can stop a release halfway through its upload")
+	}
+}
+
+// A step that belongs to one path carries that path's condition in its if:, so a run on
+// the other path never reaches it. Without the extra-artifact guard, a caller that sets
+// no extra-artifact would have download-artifact fetch every artifact of its run, each
+// in a directory, and the job would refuse them; without the published guard, a first
+// release would try to download itself before it exists.
+func TestPackageStepsStayOnTheirPath(t *testing.T) {
+	for _, tc := range []struct{ ref, guard string }{
+		{"inputs.extra-artifact", "inputs.extra-artifact != ''"},
+		{"inputs.artifact", "steps.state.outputs.published != 'true'"},
+		{"gh release download", "steps.state.outputs.published == 'true'"},
+	} {
+		found := 0
+		for _, s := range packageSteps(t) {
+			text := s.Run
+			for _, v := range s.Env {
+				text += "\n" + v
+			}
+			for _, v := range s.With {
+				text += "\n" + fmt.Sprint(v)
+			}
+			if !strings.Contains(text, tc.ref) {
+				continue
+			}
+			found++
+			if !strings.Contains(s.If, tc.guard) {
+				t.Errorf("step %q uses %s, and its if: lacks %s", s.Name+s.ID+s.Uses, tc.ref, tc.guard)
+			}
+		}
+		if found == 0 {
+			t.Errorf("no release step uses %s; this test has lost what it guards", tc.ref)
+		}
 	}
 }
 
