@@ -406,6 +406,12 @@ func TestPackageStepManifestCheck(t *testing.T) {
 		code: 1,
 		logs: []string{"has no 'tag v1.2.3' line"},
 	}, {
+		// The tag is compared as text: a dot in it is a dot, not any character.
+		name: "the manifest of a tag that only matches as a pattern",
+		tag:  "v1x2x3",
+		code: 1,
+		logs: []string{"has no 'tag v1.2.3' line"},
+	}, {
 		name: "no manifest",
 		damage: func(t *testing.T, dir string) {
 			if err := os.Remove(filepath.Join(dir, "dist", "manifest.txt")); err != nil {

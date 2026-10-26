@@ -407,8 +407,8 @@ jobs:
           errs=0
           bad() { echo "::error::$*"; errs=$((errs + 1)); }
           [ "$(head -n 1 "$m")" = "owfeed-manifest 1" ] || bad "$m does not start with 'owfeed-manifest 1'"
-          grep -qx "repo $GITHUB_REPOSITORY" "$m" || bad "$m has no 'repo $GITHUB_REPOSITORY' line"
-          grep -qx "tag $GITHUB_REF_NAME" "$m" || bad "$m has no 'tag $GITHUB_REF_NAME' line"
+          grep -qxF "repo $GITHUB_REPOSITORY" "$m" || bad "$m has no 'repo $GITHUB_REPOSITORY' line"
+          grep -qxF "tag $GITHUB_REF_NAME" "$m" || bad "$m has no 'tag $GITHUB_REF_NAME' line"
           n=0
           while read -r kind a b c d e _; do
             case "$kind" in
