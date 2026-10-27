@@ -55,7 +55,7 @@ jobs:
       # JSON at all.
       # No `version:`: since owlab v0.6.5 setup installs the release it is pinned at,
       # so this line is the whole pin and a dependabot bump moves the binary too.
-      - uses: owfeed/owlab/setup@v0.6.5
+      - uses: owfeed/owlab/setup@v0.6.6
 
       - id: compare
         run: |
