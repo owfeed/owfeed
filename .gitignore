@@ -2,6 +2,7 @@
 # entry to the user's repo too — the same rule applies to our own.
 *.pem
 *.key
+*.sec
 
 # Build output
 /owfeed

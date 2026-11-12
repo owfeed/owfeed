@@ -47,11 +47,27 @@
 
 <p class="kicker">Cookbook · 2 of 3</p>
 <h1>Build and release</h1>
-<p class="lead">Turn a working package into signed artifacts anyone can verify. Two keys are
-involved and they do different jobs — that is the part worth reading before you copy the
+<p class="lead">In this tutorial we turn a working package into signed artifacts anyone can verify,
+built in CI. Two keys are involved and they do different jobs. Read about them before you copy the
 workflow.</p>
 
-<h2>Make the two keys, once</h2>
+<ul>
+  <li>Two keys, made once: EC signs each package, usign signs the release manifest.</li>
+  <li>Build both release lines: <code>25.12.5</code> gives apk, <code>24.10.8</code> gives ipk.</li>
+  <li>Sign first, then write the manifest. The reverse order breaks the manifest.</li>
+  <li>Run <code>owfeed check</code> on every pull request. It needs no secret.</li>
+</ul>
+
+<table>
+<tr><th>You want to</th><th>Go to</th></tr>
+<tr><td>Create the signing keys</td><td><a href="#keys">Make the two keys, once</a></td></tr>
+<tr><td>Build for 25.12 and 24.10</td><td><a href="#build">Build both release lines</a></td></tr>
+<tr><td>Sign and write the manifest</td><td><a href="#sign">Sign, then write the manifest</a></td></tr>
+<tr><td>Copy a release workflow</td><td><a href="#github">GitHub Actions</a> · <a href="#gitlab">GitLab CI</a></td></tr>
+<tr><td>Check before you publish</td><td><a href="#check">Check it before anyone else does</a></td></tr>
+</table>
+
+<h2 id="keys">Make the two keys, once</h2>
 
 <pre>owfeed keygen -o author.pem       # EC prime256v1 — signs the packages
 owfeed keygen --usign -o release.key   # usign/ed25519 — signs the release manifest
@@ -61,10 +77,10 @@ gh secret set OWFEED_RELEASE_KEY &lt; release.key
 
 git add author.pub.pem release.pub &amp;&amp; git commit -m "publish the public halves"</pre>
 
-<div class="note"><strong>Commit the public halves; never the private ones.</strong> A published
-signing key cannot be revoked — apk has no CRL, no expiry, no way to say a key is dead. Generate
-them outside a git working tree; <code>owfeed keygen</code> refuses to write inside one without
-<code>--force</code>. Note the key ids it prints: a feed will ask for them.</div>
+<div class="note"><strong>Commit the public halves. Never commit the private ones.</strong> A
+published signing key cannot be revoked: apk has no CRL, no expiry, no way to say a key is dead.
+Generate the keys outside a git working tree. <code>owfeed keygen</code> refuses to write inside one
+without <code>--force</code>. Note the key ids it prints: a feed will ask for them.</div>
 
 <h3>Why two</h3>
 
@@ -74,47 +90,62 @@ them outside a git working tree; <code>owfeed keygen</code> refuses to write ins
 <tr><td>usign (<code>release.key</code>)</td><td>the release manifest</td><td>a feed, once, when it ingests your release</td></tr>
 </table>
 
-<p>The usign signature is checked at ingest and then it is done — it never leaves the feed's CI.
-The EC signature travels <em>inside the package</em> all the way to the router, so somebody who
-does not trust the feed can still confirm you built what they installed. That is the one claim
-about a package that survives the feed serving it, and it is why feeds require it.</p>
+<p>The feed checks the usign signature at ingest, and then it is done. The signature never leaves
+the feed's CI.</p>
 
-<h2>Build both release lines</h2>
+<p>The EC signature travels <em>inside the package</em> all the way to the router. Somebody who does
+not trust the feed can still confirm you built what they installed.</p>
+
+<p>That is the one claim about a package that survives the feed serving it. That is why feeds
+require it.</p>
+
+<h2 id="build">Build both release lines</h2>
 
 <pre>owlab build --release 25.12.5    # apk, for 25.12 and later
 owlab build --release 24.10.8    # ipk, for 24.10 and earlier</pre>
 
 <p>Both land in <code>dist/&lt;arch&gt;/</code>. An architecture-independent package produces two
-directories, and that is correct rather than a bug: apk requires <code>noarch</code> and rejects
-<code>all</code>, opkg has never heard of <code>noarch</code>.</p>
+directories:</p>
 
 <pre>dist/
 ├── noarch/my-app-1.0.0-r1.apk
 └── all/my-app_1.0.0-r1_all.ipk</pre>
 
-<p>Shipping only 25.12 abandons everyone who has not upgraded — routers stay on a release for
-years.</p>
+<p>Two directories are correct. apk requires <code>noarch</code> and rejects <code>all</code>. opkg
+has never heard of <code>noarch</code>.</p>
+
+<p>Build both lines. Routers stay on a release for years, so shipping only 25.12 abandons everyone
+who has not upgraded.</p>
 
 <div class="note"><strong>Build before you release, even if sync worked.</strong>
 <code>luci.mk</code> minifies JS and CSS; <code>owlab sync</code> does not. Code that works
 unminified and breaks minified is invisible until somebody builds a package.</div>
 
-<h2>Sign, then write the manifest — in that order</h2>
+<h2 id="sign">Sign, then write the manifest</h2>
 
 <pre>owfeed sign --key env:OWFEED_AUTHOR_KEY
 owfeed release --repo "$GITHUB_REPOSITORY" --tag "$GITHUB_REF_NAME"</pre>
 
-<p><strong>The order is not a preference.</strong> <code>owfeed release</code> records every
-package's size and sha256, and signing appends bytes. Reverse them and the manifest describes files
-that no longer exist.</p>
+<p><strong>Keep this order.</strong> <code>owfeed release</code> records every package's size and
+sha256, and signing appends bytes. Reverse them and the manifest describes files that no longer
+exist.</p>
 
-<p><code>owfeed release</code> writes <code>manifest.txt</code>: what belongs to this release, each
-file's size and hash, and which repository and tag it came from — signed with your usign key. It
-records the repository because <strong>a signature proves who wrote something, never what it is
-about</strong>. Without that line, a manifest lifted from another of your releases would verify
+<h3>What the manifest records</h3>
+
+<p><code>owfeed release</code> writes <code>manifest.txt</code> and signs it with your usign key. It
+records:</p>
+
+<ul>
+  <li>what belongs to this release;</li>
+  <li>each file's size and hash;</li>
+  <li>which repository and tag it came from.</li>
+</ul>
+
+<p>It records the repository because <strong>a signature proves who wrote something, never what it
+is about</strong>. Without that line, a manifest lifted from another of your releases would verify
 perfectly as this one.</p>
 
-<h2>GitHub Actions</h2>
+<h2 id="github">GitHub Actions</h2>
 
 <p class="kicker">.github/workflows/release.yml</p>
 <pre>name: release
@@ -145,15 +176,20 @@ jobs:
              dist/*/*.apk dist/*/*.ipk dist/manifest.txt*
         env: { GH_TOKEN: ${{ github.token }} }</pre>
 
-<p><code>owfeed release</code> reads the repository and tag from <code>GITHUB_REPOSITORY</code> and
-<code>GITHUB_REF_NAME</code> on GitHub, and from <code>CI_PROJECT_PATH</code> and
-<code>CI_COMMIT_TAG</code> on GitLab, so the flags are only for overriding them.</p>
+<p><code>owfeed release</code> reads the repository and tag from the CI environment, so the flags
+are only for overriding them:</p>
+
+<table>
+<tr><th>CI</th><th>Repository</th><th>Tag</th></tr>
+<tr><td>GitHub</td><td><code>GITHUB_REPOSITORY</code></td><td><code>GITHUB_REF_NAME</code></td></tr>
+<tr><td>GitLab</td><td><code>CI_PROJECT_PATH</code></td><td><code>CI_COMMIT_TAG</code></td></tr>
+</table>
 
 <div class="note"><strong>Keep the signing steps in a job that pull requests cannot reach.</strong>
-A fork's pull request runs your build; a secret reachable from it is a secret published. Gate on the
-tag, as above, or use a separate job with an <code>environment:</code>.</div>
+A fork's pull request runs your build, and a secret reachable from it is a secret published. Gate
+on the tag, as above, or use a separate job with an <code>environment:</code>.</div>
 
-<h2>GitLab CI</h2>
+<h2 id="gitlab">GitLab CI</h2>
 
 <pre>release:
   rules:
@@ -167,26 +203,29 @@ tag, as above, or use a separate job with an <code>environment:</code>.</div>
     - owfeed sign --key env:OWFEED_AUTHOR_KEY
     - owfeed release</pre>
 
-<h2>Check it before anyone else does</h2>
+<h2 id="check">Check it before anyone else does</h2>
 
 <pre>owfeed check</pre>
 
-<p><code>owfeed check</code> builds, signs, indexes and runs <code>doctor --require-origin</code>
-on an EC key and a usign key it generates for the run and throws away, in a temporary directory it
-removes afterwards. Run it on every pull request: it needs no <code>signing:</code> block and no
-secret, so a fork's code never runs beside a real key.</p>
+<p><code>owfeed check</code> builds, signs, indexes and runs <code>doctor --require-origin</code>.
+It uses an EC key and a usign key generated for the run and thrown away. It works in a temporary
+directory and removes it afterwards.</p>
 
-<p>Run <code>owfeed doctor</code> on its own only when you have an indexed tree — it reads
-<code>out/</code> and stops with <em>run <code>owfeed index</code> first</em> otherwise, which a
-repository that publishes releases rather than a feed never produces.</p>
+<p>Run it on every pull request. It needs no <code>signing:</code> block and no secret, so a fork's
+code never runs beside a real key.</p>
 
-<p>Numbered findings, each saying what it costs and what to do. The ones that catch most first
-attempts:</p>
+<p>Run <code>owfeed doctor</code> on its own only when you have an indexed tree. It reads
+<code>out/</code> and otherwise stops with <em>run <code>owfeed index</code> first</em>. A
+repository that publishes releases rather than a feed never produces that tree.</p>
+
+<h3>Findings that catch most first attempts</h3>
+
+<p>Findings are numbered. Each one says what it costs and what to do.</p>
 
 <table>
 <tr><th>Finding</th><th>What it means</th></tr>
-<tr><td><code>arch: all</code></td><td>apk rejects it as uninstallable. Use <code>LUCI_PKGARCH:=all</code> and let the build translate it — that is what OpenWrt's own packaging does.</td></tr>
-<tr><td>OWF207</td><td>A <code>/etc/config/*</code> file is shipped but not in <code>conffiles:</code>, so sysupgrade replaces the user's settings with your defaults, silently, on every firmware upgrade.</td></tr>
+<tr><td><code>arch: all</code></td><td>apk rejects it as uninstallable. Use <code>LUCI_PKGARCH:=all</code> and let the build translate it. OpenWrt's own packaging does the same.</td></tr>
+<tr><td>OWF207</td><td>A <code>/etc/config/*</code> file is shipped but not in <code>conffiles:</code>. On every firmware upgrade, sysupgrade silently replaces the user's settings with your defaults.</td></tr>
 <tr><td>Version rejected</td><td>After <code>~</code> apk reads a commit hash, so only hex. Write <code>1.0_beta1</code>, not <code>1.0~beta</code>.</td></tr>
 <tr><td>Translations missing</td><td>LuCI reads compiled <code>.lmo</code> and ignores <code>.po</code>. Point <code>i18n.from:</code> at your catalogues.</td></tr>
 </table>
