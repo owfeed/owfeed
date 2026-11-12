@@ -52,23 +52,8 @@ func (a *app) smoke(ctx context.Context, args []string) error {
 		return fail(exitConfig, "owfeed.yml configures no release line %q", line)
 	}
 
-	opts := smoke.Options{Format: format}
-	if format == config.FormatIPK {
-		key, err := a.usignKey(c)
-		if err != nil {
-			return err
-		}
-		opts.UsignKeyID = key.ID.String()
-		// The 24.10 images are the ones that carry opkg; the apk default would be a
-		// router that cannot read this feed at all.
-		if *image == "" {
-			opts.Image = ""
-		}
-	}
-
-	res, err := smoke.Run(ctx, smoke.Options{
-		Format:       opts.Format,
-		UsignKeyID:   opts.UsignKeyID,
+	opts := smoke.Options{
+		Format:       format,
 		Dir:          out,
 		FeedName:     c.Feed.Name,
 		Release:      line,
@@ -76,7 +61,16 @@ func (a *app) smoke(ctx context.Context, args []string) error {
 		LayoutPath:   c.Layout.Path,
 		Arch:         *arch,
 		Image:        *image,
-	})
+	}
+	if format == config.FormatIPK {
+		key, err := a.usignKey(c)
+		if err != nil {
+			return err
+		}
+		opts.UsignKeyID = key.ID.String()
+	}
+
+	res, err := smoke.Run(ctx, opts)
 	if err != nil {
 		// 7 for everything the router said, 8 only when Docker Hub would not hand
 		// over the image: nothing about the feed was tried then.
