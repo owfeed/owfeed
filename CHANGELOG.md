@@ -2,7 +2,7 @@
 
 Dates are when the tag was cut. Anything not listed is documentation or tests.
 
-## Unreleased
+## v0.5.7 — 2026-11-12
 
 - **Fixed:** `owfeed smoke -arch` installs on an image of that architecture (#24). It
   used to run every image as `linux/amd64`, so any other `-arch` failed: the default
@@ -17,7 +17,7 @@ Dates are when the tag was cut. Anything not listed is documentation or tests.
   install. Any arch other than x86_64 needs QEMU registered with binfmt_misc on an
   x86_64 host.
 
-## v0.5.6 — 2026-10-26
+## v0.5.7 — 2026-10-26
 
 - **Fixed:** a `package.yml` run over a tag whose release is already published re-checks
   that release and signs nothing. It used to sign again, and `adbsign`'s ECDSA signature
