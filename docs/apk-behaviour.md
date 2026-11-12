@@ -529,6 +529,49 @@ starting with `-` except `--force-overwrite` and
 Building the index needs `mkndx --allow-untrusted`, or it refuses the unsigned
 package with `UNTRUSTED signature`, exit 99, and writes nothing.
 
+### The images carry the package arch as their Docker platform
+
+OpenWrt publishes `openwrt/rootfs:<arch>-<point>` for seven package arches only:
+`x86_64`, `aarch64_generic`, `arm_cortex-a15_neon-vfpv4`, `arm_cortex-a9_vfpv3-d16`,
+`i386_pentium4`, `i386_pentium-mmx` and `mips_24kc`. Target-named tags
+(`armsr-armv8-25.12.6`, `x86-64-25.12.6`) are the same images: `x86-64-25.12.6` and
+`x86_64-25.12.6` are one digest. Only x86_64 is labelled the Docker way, as
+`linux/amd64`. The rest carry the package arch, so `docker run --platform linux/arm64`
+refuses an aarch64 image, while the image's own platform or no `--platform` runs it.
+`docker pull --platform` checks nothing for an image published for one platform: the
+aarch64 image pulls under `--platform linux/amd64`. Docker 29.1.4, Docker Hub tags of
+25.12.6. Date: 2026-11-12.
+
+```sh
+curl -s https://hub.docker.com/v2/repositories/openwrt/rootfs/tags/aarch64_generic-25.12.6 \
+  | jq -c '[.images[] | {os, architecture}]'
+#   [{"os":"linux","architecture":"aarch64_generic"}]
+docker run --rm --platform linux/arm64 openwrt/rootfs:aarch64_generic-25.12.6 uname -m
+#   image ... was found but does not provide the specified platform (linux/arm64)
+docker run --rm --platform linux/aarch64_generic openwrt/rootfs:aarch64_generic-25.12.6 uname -m
+#   exec /bin/uname: exec format error      (an x86_64 host with no QEMU registered)
+```
+
+Docker Hub's tag `name` filter is a LIKE pattern: `name=x86_64-24.10` also returns
+`x86-64-24.10.8`.
+
+### A package of a sibling arch installs once `/etc/apk/arch` lists it
+
+apk refuses a package whose arch the router does not list, so an `aarch64_cortex-a53`
+package is `uninstallable` on the `aarch64_generic` image. A second line in
+`/etc/apk/arch` is enough. Measured on `openwrt/rootfs:x86_64-25.12.6` with OpenWrt's
+own `px5g-standalone-11.apk` from `packages/aarch64_cortex-a53/base`:
+
+```sh
+apk add --allow-untrusted --no-network /t/px5g.apk
+#   px5g-standalone-11:
+#     error: uninstallable
+#     arch: aarch64_cortex-a53
+printf 'x86_64\naarch64_cortex-a53\n' > /etc/apk/arch
+apk add --allow-untrusted --no-network /t/px5g.apk
+#   (1/1) Installing px5g-standalone (11)
+```
+
 ---
 
 ## Extracting a host apk from the SDK
@@ -808,6 +851,28 @@ opkg_conf_load: Could not create lock file /var/lock/opkg.lock: No such file or 
 ```
 
 The rootfs images ship without it.
+
+## One `arch` line in `opkg.conf` replaces the built-in list
+
+The image's `opkg.conf` names no arch, and opkg falls back to a built-in list. The
+first `arch` line replaces that list, so accepting a sibling arch means writing the
+list out before extending it. Measured on `openwrt/rootfs:x86_64-24.10.8` with
+OpenWrt's `px5g-standalone` ipk from 24.10.4 `packages/aarch64_cortex-a53/base`.
+Date: 2026-11-12.
+
+```sh
+opkg print-architecture
+#   arch all 1
+#   arch noarch 1
+#   arch x86_64 10
+opkg install /t/px5g.ipk
+#   Packages for px5g-standalone found, but incompatible with the architectures configured
+echo 'arch aarch64_cortex-a53 20' >> /etc/opkg.conf; opkg print-architecture
+#   arch aarch64_cortex-a53 20
+```
+
+On a fresh image, `opkg print-architecture >> /etc/opkg.conf` before that line keeps
+all four, and the package is accepted.
 
 ## All four lifecycle scripts run, and only two have a `default_` helper
 

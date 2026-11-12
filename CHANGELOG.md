@@ -2,6 +2,21 @@
 
 Dates are when the tag was cut. Anything not listed is documentation or tests.
 
+## Unreleased
+
+- **Fixed:** `owfeed smoke -arch` installs on an image of that architecture (#24). It
+  used to run every image as `linux/amd64`, so any other `-arch` failed: the default
+  x86-64 image refused the package as uninstallable, and an `-image` such as
+  `openwrt/rootfs:aarch64_generic-openwrt-25.12` was refused by Docker, which knows it
+  as `linux/aarch64_generic`. The default image is now `openwrt/rootfs:<arch>-<point>`,
+  and every `aarch64_*` arch uses `aarch64_generic`. The platform is read from the image
+  after the pull, and the router is told to accept the package's arch. An image of
+  another instruction set is refused before anything runs. An arch with no published
+  image, such as `mipsel_24kc`, fails with a message to pass `-image`. A host that
+  cannot run the image fails with how to register QEMU, not as a feed that did not
+  install. Any arch other than x86_64 needs QEMU registered with binfmt_misc on an
+  x86_64 host.
+
 ## v0.5.6 — 2026-10-26
 
 - **Fixed:** a `package.yml` run over a tag whose release is already published re-checks

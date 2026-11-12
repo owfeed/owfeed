@@ -14,7 +14,7 @@ import (
 func (a *app) smoke(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("owfeed smoke", flag.ContinueOnError)
 	fs.SetOutput(a.err)
-	image := fs.String("image", "", "router image (default: derived from the release line)")
+	image := fs.String("image", "", "router image (default: derived from -arch and the release line)")
 	arch := fs.String("arch", smoke.DefaultArch, "architecture to install")
 	release := fs.String("release", "", "release line (default: the one owfeed.yml advertises)")
 	if err := fs.Parse(args); err != nil {
