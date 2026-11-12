@@ -2,6 +2,10 @@
 
 Dates are when the tag was cut. Anything not listed is documentation or tests.
 
+## Unreleased
+
+- **Dependencies:** `github.com/klauspost/compress` v1.20.0 to v1.20.3 (#36).
+
 ## v0.5.7 — 2026-11-12
 
 - **Fixed:** `owfeed smoke -arch` installs on an image of that architecture (#24). It

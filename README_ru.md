@@ -36,7 +36,9 @@ darwin, amd64 и arm64.
 **Что нужно рядом.** Для `build`, `sign`, `index` и `publish` — ничего: apk-тулчейн скачивается из
 OpenWrt SDK и проверяется запиненным ключом подписи, ставить нечего. `smoke` требует Docker, потому
 что установка на живой образ OpenWrt — весь его смысл. На macOS Docker нужен и для `build`:
-apk-tools там не собирается.
+apk-tools там не собирается. `smoke -arch` для чего угодно, кроме x86_64, запускает эмулируемый
+образ, поэтому на x86_64-хосте нужен зарегистрированный QEMU:
+`docker run --privileged --rm tonistiigi/binfmt --install arm64`.
 
 ---
 

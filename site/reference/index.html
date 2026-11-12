@@ -111,7 +111,7 @@ writes a report to stdout.</p>
 <tr><td><code>owfeed index</code></td><td>Fan the packages out per architecture and write a signed index in each.</td></tr>
 <tr><td><code>owfeed doctor</code></td><td>Check the built tree. <code>--require-origin</code> demands every package name its source repository; <code>--author-keys DIR</code> demands every package carry a signature by a key pinned in DIR.</td></tr>
 <tr><td><code>owfeed check</code></td><td>Build, sign, index and <code>doctor</code> on keys generated for the run and discarded. Needs no <code>signing:</code> block and leaves nothing behind — what a pull request can verify with no secret in scope.</td></tr>
-<tr><td><code>owfeed smoke</code></td><td>Install the built feed on a real OpenWrt image. <code>--release 24.10</code> for the older line.</td></tr>
+<tr><td><code>owfeed smoke</code></td><td>Install the built feed on a real OpenWrt image. <code>--release 24.10</code> for the older line, <code>--arch aarch64_cortex-a53</code> for another architecture (needs QEMU on an x86_64 host).</td></tr>
 <tr><td><code>owfeed verify</code></td><td>Check the published feed from outside, over its documented URL.</td></tr>
 <tr><td><code>owfeed publish</code></td><td>Gate the tree on those checks and hand it to the target. No override flag.</td></tr>
 <tr><td><code>owfeed release</code></td><td>Sign the built packages and write a signed manifest for a feed to consume.</td></tr>
