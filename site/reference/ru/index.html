@@ -111,7 +111,7 @@
 <tr><td><code>owfeed index</code></td><td>Разложить пакеты по архитектурам и написать в каждой подписанный индекс.</td></tr>
 <tr><td><code>owfeed doctor</code></td><td>Проверить собранное дерево. <code>--require-origin</code> требует, чтобы каждый пакет называл свой репозиторий; <code>--author-keys DIR</code> — чтобы каждый нёс подпись ключом, зафиксированным в DIR.</td></tr>
 <tr><td><code>owfeed check</code></td><td>Сборка, подпись, индекс и <code>doctor</code> на ключах, созданных на время запуска и выброшенных. Не требует блока <code>signing:</code> и ничего не оставляет за собой — всё, что пулл-реквест может проверить, не имея секретов.</td></tr>
-<tr><td><code>owfeed smoke</code></td><td>Поставить собранный фид на живой образ OpenWrt. <code>--release 24.10</code> для старой линии.</td></tr>
+<tr><td><code>owfeed smoke</code></td><td>Поставить собранный фид на живой образ OpenWrt. <code>--release 24.10</code> для старой линии, <code>--arch aarch64_cortex-a53</code> для другой архитектуры (на x86_64-хосте нужен QEMU).</td></tr>
 <tr><td><code>owfeed verify</code></td><td>Проверить опубликованный фид снаружи, по его же документированному URL.</td></tr>
 <tr><td><code>owfeed publish</code></td><td>Пропустить дерево через проверки и отдать цели публикации. Флага «всё равно опубликовать» нет.</td></tr>
 <tr><td><code>owfeed release</code></td><td>Подписать собранные пакеты и написать подписанный манифест для фида.</td></tr>

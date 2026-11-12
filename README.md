@@ -35,7 +35,9 @@ linux and darwin, amd64 and arm64.
 **What it needs.** Nothing for `build`, `sign`, `index` or `publish`: the apk toolchain is fetched
 from the OpenWrt SDK and verified against a pinned signing key, so there is no toolchain to install.
 `smoke` needs Docker, because installing on a real OpenWrt image is the whole point of it. On macOS
-`build` needs Docker too — apk-tools does not build there.
+`build` needs Docker too — apk-tools does not build there. `smoke -arch` for anything but x86_64
+runs an emulated image, so on an x86_64 host it needs QEMU registered:
+`docker run --privileged --rm tonistiigi/binfmt --install arm64`.
 
 ---
 
