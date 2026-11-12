@@ -158,7 +158,7 @@ jobs:
     permissions: { contents: write }
     steps:
       - uses: actions/checkout@v5
-      - uses: owfeed/owlab/setup@v0.7.1
+      - uses: owfeed/owlab/setup@v0.8.0
       - uses: owfeed/owfeed/setup@v0.5.8
 
       - run: owlab build --release 25.12.5
@@ -195,7 +195,7 @@ on the tag, as above, or use a separate job with an <code>environment:</code>.</
   rules:
     - if: $CI_COMMIT_TAG
   script:
-    - wget -qO- https://github.com/owfeed/owlab/releases/download/v0.7.1/owlab_0.7.1_linux_amd64.tar.gz | tar xz
+    - wget -qO- https://github.com/owfeed/owlab/releases/download/v0.8.0/owlab_0.8.0_linux_amd64.tar.gz | tar xz
     - wget -qO owfeed https://github.com/owfeed/owfeed/releases/latest/download/owfeed-linux-amd64
     - chmod +x owfeed &amp;&amp; export PATH="$PWD:$PATH"
     - owlab build --release 25.12.5
