@@ -30,9 +30,9 @@ import (
 	"owfeed.org/owfeed/internal/netx"
 )
 
-// DefaultArch is the architecture smoked. It is x86_64 because that is the one
-// OpenWrt publishes a container image for and the one Docker runs without
-// emulation; the others are covered by the index checks rather than by installing.
+// DefaultArch is the architecture smoked when none is named. It is x86_64 because
+// that is the image Docker runs without emulation on most hosts; any other needs QEMU
+// registered with binfmt_misc.
 const DefaultArch = "x86_64"
 
 // Options configure a run.
@@ -47,7 +47,7 @@ type Options struct {
 	LayoutPath string
 	// Arch is the architecture to install; empty means DefaultArch.
 	Arch string
-	// Image is the router image. Empty derives one from PointRelease.
+	// Image is the router image. Empty derives one from Arch and PointRelease.
 	Image string
 	// PointRelease is the concrete release the image should match, e.g. "25.12.4".
 	PointRelease string
@@ -82,10 +82,11 @@ func Run(ctx context.Context, opts Options) (*Result, error) {
 	if arch == "" {
 		arch = DefaultArch
 	}
+	imgArch := imageArch(arch)
 	image := opts.Image
 	if image == "" {
 		var err error
-		if image, err = ResolveImage(ctx, opts.Release, opts.PointRelease); err != nil {
+		if image, err = ResolveImage(ctx, imgArch, opts.Release, opts.PointRelease); err != nil {
 			return nil, err
 		}
 	}
@@ -117,17 +118,32 @@ func Run(ctx context.Context, opts Options) (*Result, error) {
 	// Pulled first and on its own, so that Docker Hub not answering is reported as
 	// that. Left to `docker run`, a registry 503 came back as "the feed did not
 	// install", exit 7, with no package ever tried.
-	if err := ensureImage(ctx, image); err != nil {
+	platform, err := ensureImage(ctx, image, dockerPlatform(imgArch))
+	if err != nil {
 		return nil, err
 	}
+	// The script adds arch to the router's accepted list, so an image of another
+	// instruction set would install the package without ever being able to run it.
+	if isa(platform) != isa(arch) {
+		return nil, fmt.Errorf("%s is a %s image and cannot run %s packages; pass -image with an %s one",
+			image, platform, arch, isa(arch))
+	}
 
+	// The platform is the image's own. OpenWrt labels its images with the package
+	// arch (linux/aarch64_generic), and `docker run` refuses any other platform.
 	cmd := exec.CommandContext(ctx, "docker", "run", "--rm",
-		"--platform", "linux/amd64",
+		"--platform", platform,
 		"-v", abs+":/feed:ro",
 		image, "sh", "-c", body)
 
 	out, runErr := cmd.CombinedOutput()
 	res := &Result{Image: image, Arch: arch, Installed: pkgs, Log: string(out)}
+
+	if runErr != nil && strings.Contains(res.Log, "exec /bin/sh: exec format error") {
+		return res, fmt.Errorf("%s: this host cannot run %s images, so nothing was installed. "+
+			"Register QEMU for it with binfmt_misc, e.g. `docker run --privileged --rm tonistiigi/binfmt --install all`\n%s",
+			image, platform, res.Log)
+	}
 
 	for _, line := range strings.Split(res.Log, "\n") {
 		if pin, ok := strings.CutPrefix(line, markerPin); ok {
@@ -164,26 +180,72 @@ func Run(ctx context.Context, opts Options) (*Result, error) {
 // the feed is *built* against is frequently one nobody has published an image for.
 // Asking which tags exist and taking the newest is the difference between a check
 // that works on the day a release ships and one that has to be repaired by hand.
-func ResolveImage(ctx context.Context, line, point string) (string, error) {
-	tags, err := imageTags(ctx, line)
-	if err != nil || len(tags) == 0 {
-		// The registry is not reachable, or has nothing for this line. Fall back to
-		// the release the feed was built against and let docker report the truth.
+//
+// arch is the image's arch, as imageArch gives it.
+func ResolveImage(ctx context.Context, arch, line, point string) (string, error) {
+	tags, err := imageTags(ctx, arch, line)
+	if err != nil {
+		// The registry is not reachable. Fall back to the release the feed was built
+		// against and let docker report the truth.
 		if point == "" {
 			return "", fmt.Errorf("cannot tell which %s router image to use: %w", line, err)
 		}
-		return imageRef(point), nil
+		return imageRef(arch, point), nil
+	}
+	if len(tags) == 0 {
+		return "", fmt.Errorf("no openwrt/rootfs:%s-%s.N image is published on Docker Hub; "+
+			"pass -image with one that runs %s packages", arch, line, arch)
 	}
 	// Prefer the release the feed was built against, when an image for it exists.
 	for _, t := range tags {
 		if t == point {
-			return imageRef(t), nil
+			return imageRef(arch, t), nil
 		}
 	}
-	return imageRef(tags[len(tags)-1]), nil
+	return imageRef(arch, tags[len(tags)-1]), nil
 }
 
-func imageRef(point string) string { return "openwrt/rootfs:x86-64-" + point }
+// The image tags are named after the package arch, x86_64 included: x86_64-25.12.6
+// and x86-64-25.12.6 are one digest.
+func imageRef(arch, point string) string { return "openwrt/rootfs:" + arch + "-" + point }
+
+// imageArch is the arch of the image a package for arch is installed on.
+//
+// OpenWrt publishes images for a handful of arches only. Every aarch64_* arch is
+// ARMv8-A with one ABI, so its packages run on the aarch64_generic image. The 32-bit
+// arm and mips arches differ in float ABI and byte order, so none stands in for
+// another; those without an image of their own need -image.
+func imageArch(arch string) string {
+	if isa(arch) == "aarch64" {
+		return "aarch64_generic"
+	}
+	return arch
+}
+
+// dockerPlatform is the platform an OpenWrt image of arch is published under.
+// x86_64 is the one labelled the Docker way; the rest carry the package arch.
+func dockerPlatform(arch string) string {
+	if arch == "x86_64" {
+		return "linux/amd64"
+	}
+	return "linux/" + arch
+}
+
+// isa is the instruction set a package arch or a Docker platform names: the part
+// before the first "_", so aarch64_cortex-a53 and linux/aarch64_generic agree.
+func isa(arch string) string {
+	arch = strings.TrimPrefix(arch, "linux/")
+	switch arch {
+	case "amd64", "x86_64":
+		return "x86_64"
+	case "arm64":
+		return "aarch64"
+	case "386":
+		return "i386"
+	}
+	name, _, _ := strings.Cut(arch, "_")
+	return name
+}
 
 // Three pulls, 5 s and 10 s apart. Variables so tests need not wait.
 var (
@@ -191,43 +253,58 @@ var (
 	pullDelay    = 5 * time.Second
 )
 
-// ensureImage makes sure the linux/amd64 image is present, pulling it when it is not.
+// ensureImage makes sure image is present, pulling it for platform when it is not,
+// and returns the platform the local copy is for.
 //
 // A copy already present is used without asking the registry, as `docker run` would:
 // `docker pull` checks the digest even then, and during a Hub outage that would fail
-// a run that needs nothing from the Hub.
-func ensureImage(ctx context.Context, image string) error {
-	have, err := exec.CommandContext(ctx, "docker", "image", "inspect",
-		"--format", "{{.Os}}/{{.Architecture}}", image).Output()
-	if err == nil && strings.TrimSpace(string(have)) == "linux/amd64" {
-		return nil
+// a run that needs nothing from the Hub. Any copy of platform's instruction set will
+// do, so an -image of a sibling arch is not pulled again on every run.
+//
+// The platform is read back rather than assumed: `docker pull --platform` does not
+// check it against an image published for one platform only.
+func ensureImage(ctx context.Context, image, platform string) (string, error) {
+	inspect := func() string {
+		have, err := exec.CommandContext(ctx, "docker", "image", "inspect",
+			"--format", "{{.Os}}/{{.Architecture}}", image).Output()
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(string(have))
+	}
+	if have := inspect(); have != "" && isa(have) == isa(platform) {
+		return have, nil
 	}
 
 	delay := pullDelay
 	var out []byte
+	var err error
 	for attempt := 1; ; attempt++ {
-		out, err = exec.CommandContext(ctx, "docker", "pull", "--platform", "linux/amd64", image).CombinedOutput()
+		out, err = exec.CommandContext(ctx, "docker", "pull", "--platform", platform, image).CombinedOutput()
 		if err == nil {
-			return nil
+			if have := inspect(); have != "" {
+				return have, nil
+			}
+			return "", fmt.Errorf("docker image inspect %s: no image after a successful pull", image)
 		}
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return "", ctx.Err()
 		}
 		if !pullOutage(string(out)) {
 			// `manifest unknown`, `pull access denied`: the registry answered.
-			return fmt.Errorf("docker pull %s: %w\n%s", image, err, out)
+			return "", fmt.Errorf("docker pull %s: %w\n%s", image, err, out)
 		}
 		if attempt >= pullAttempts {
 			break
 		}
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return "", ctx.Err()
 		case <-time.After(delay):
 		}
 		delay *= 2
 	}
-	return netx.Outage(fmt.Errorf("docker pull %s failed %d times and the registry is not answering "+
+	return "", netx.Outage(fmt.Errorf("docker pull %s failed %d times and the registry is not answering "+
 		"(an upstream outage, not a finding about the feed; safe to run again later): %w\n%s",
 		image, pullAttempts, err, out))
 }
@@ -246,13 +323,10 @@ var pullOutageRE = regexp.MustCompile(`(?i)toomanyrequests|too many requests|bad
 
 func pullOutage(out string) bool { return pullOutageRE.MatchString(out) }
 
-// pointTagRE matches a final point release, so release candidates are not picked
-// up: an -rc image is a router nobody is running.
-var pointTagRE = regexp.MustCompile(`^x86-64-([0-9]+\.[0-9]+\.[0-9]+)$`)
-
-// imageTags lists the published point releases for a line, oldest first.
-func imageTags(ctx context.Context, line string) ([]string, error) {
-	url := "https://hub.docker.com/v2/repositories/openwrt/rootfs/tags?page_size=100&name=x86-64-" + line
+// imageTags lists the published point releases of arch's image for a line, oldest
+// first.
+func imageTags(ctx context.Context, arch, line string) ([]string, error) {
+	url := "https://hub.docker.com/v2/repositories/openwrt/rootfs/tags?page_size=100&name=" + arch + "-" + line
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -275,14 +349,27 @@ func imageTags(ctx context.Context, line string) ([]string, error) {
 		return nil, err
 	}
 
+	names := make([]string, len(doc.Results))
+	for i, r := range doc.Results {
+		names[i] = r.Name
+	}
+	return pointTags(arch, names), nil
+}
+
+// pointTags keeps the final point releases of arch's image, oldest first. Release
+// candidates are dropped: an -rc image is a router nobody is running. The Hub's name
+// filter is a LIKE pattern, where "_" matches any character, so x86_64-25.12 also
+// returns x86-64-25.12.6; the exact match here is what tells them apart.
+func pointTags(arch string, names []string) []string {
+	re := regexp.MustCompile(`^` + regexp.QuoteMeta(arch) + `-([0-9]+\.[0-9]+\.[0-9]+)$`)
 	var out []string
-	for _, r := range doc.Results {
-		if m := pointTagRE.FindStringSubmatch(r.Name); m != nil {
+	for _, n := range names {
+		if m := re.FindStringSubmatch(n); m != nil {
 			out = append(out, m[1])
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return lessPoint(out[i], out[j]) })
-	return out, nil
+	return out
 }
 
 // lessPoint orders point releases numerically, so 25.12.10 follows 25.12.9.
@@ -311,6 +398,9 @@ func script(feed, release, layout, arch string, pkgs []string) string {
 	first := pkgs[0]
 
 	return `set -e
+# An aarch64_cortex-a53 package on the aarch64_generic image is "uninstallable"
+# until its arch is one apk accepts here. On the arch's own image this changes nothing.
+grep -qx '` + arch + `' /etc/apk/arch || echo '` + arch + `' >> /etc/apk/arch
 mkdir -p /etc/apk/keys /etc/apk/repositories.d
 cp /feed/` + feed + `.pem /etc/apk/keys/` + feed + `.pem
 echo "` + repo + `" > /etc/apk/repositories.d/` + feed + `.list
@@ -348,6 +438,13 @@ cp /feed/` + keyID + ` /etc/opkg/keys/` + keyID + `
 
 # Signature checking must be on, or this proves nothing about the signature.
 grep -q '^option check_signature' /etc/opkg.conf
+
+# As for apk, a sibling arch is refused until opkg accepts it. The first arch line
+# replaces opkg's built-in list, so that list is written out before it is extended.
+if ! opkg print-architecture | grep -q '^arch ` + arch + ` '; then
+	opkg print-architecture >> /etc/opkg.conf
+	echo 'arch ` + arch + ` 20' >> /etc/opkg.conf
+fi
 
 echo "src/gz ` + feed + ` ` + repo + `" > /etc/opkg/customfeeds.conf
 opkg update

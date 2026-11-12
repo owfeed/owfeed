@@ -46,3 +46,67 @@ func TestScriptMatchesTheRequestedFormat(t *testing.T) {
 		}
 	}
 }
+
+// A package is installed on the image of its own arch where OpenWrt publishes one,
+// on aarch64_generic for any aarch64 arch, and run under the platform the image is
+// labelled with: linux/amd64 for x86_64 only, the package arch for the rest.
+func TestImageFollowsTheArch(t *testing.T) {
+	cases := []struct{ arch, image, platform string }{
+		{"x86_64", "openwrt/rootfs:x86_64-25.12.6", "linux/amd64"},
+		{"aarch64_cortex-a53", "openwrt/rootfs:aarch64_generic-25.12.6", "linux/aarch64_generic"},
+		{"aarch64_generic", "openwrt/rootfs:aarch64_generic-25.12.6", "linux/aarch64_generic"},
+		{"mips_24kc", "openwrt/rootfs:mips_24kc-25.12.6", "linux/mips_24kc"},
+		{"arm_cortex-a7_neon-vfpv4", "openwrt/rootfs:arm_cortex-a7_neon-vfpv4-25.12.6", "linux/arm_cortex-a7_neon-vfpv4"},
+	}
+	for _, c := range cases {
+		a := imageArch(c.arch)
+		if got := imageRef(a, "25.12.6"); got != c.image {
+			t.Errorf("%s: image %s, want %s", c.arch, got, c.image)
+		}
+		if got := dockerPlatform(a); got != c.platform {
+			t.Errorf("%s: platform %s, want %s", c.arch, got, c.platform)
+		}
+		if isa(dockerPlatform(a)) != isa(c.arch) {
+			t.Errorf("%s: its own image's platform %s is refused", c.arch, dockerPlatform(a))
+		}
+	}
+	// An image of another instruction set must be refused, or the arch line the
+	// script adds would install the package where it can never run.
+	for _, p := range []struct{ platform, arch string }{
+		{"linux/amd64", "aarch64_cortex-a53"},
+		{"linux/aarch64_generic", "arm_cortex-a7_neon-vfpv4"},
+		{"linux/mips_24kc", "mipsel_24kc"},
+	} {
+		if isa(p.platform) == isa(p.arch) {
+			t.Errorf("a %s image is accepted for %s", p.platform, p.arch)
+		}
+	}
+	if isa("linux/arm64") != isa("aarch64_cortex-a53") {
+		t.Error("a Docker-labelled linux/arm64 image is refused for aarch64")
+	}
+}
+
+// What the Hub returned for name=x86_64-25.12: its "_" is a wildcard, so the x86-64
+// spelling and release candidates come back too.
+func TestPointTagsKeepsOnlyTheArchsFinalReleases(t *testing.T) {
+	names := []string{"x86-64-25.12.6", "x86_64-25.12.10", "x86_64-25.12.0-rc1",
+		"x86_64-25.12-SNAPSHOT", "x86_64-25.12.9", "x86_64-v25.12.9"}
+	got := strings.Join(pointTags("x86_64", names), " ")
+	if got != "25.12.9 25.12.10" {
+		t.Errorf("pointTags = %q, want %q", got, "25.12.9 25.12.10")
+	}
+}
+
+// Both scripts must make the package's arch acceptable, or a sibling-arch package
+// is refused as uninstallable before anything about the feed is tried.
+func TestScriptsAcceptThePackageArch(t *testing.T) {
+	pkgs := []string{"luci-app-demo"}
+	apk := script("myfeed", "25.12", "releases/{release}/{arch}", "aarch64_cortex-a53", pkgs)
+	if !strings.Contains(apk, "echo 'aarch64_cortex-a53' >> /etc/apk/arch") {
+		t.Errorf("the apk script does not add the arch:\n%s", apk)
+	}
+	opkg := scriptOpkg("myfeed", "24.10", "releases/{release}/{arch}", "aarch64_cortex-a53", "0bdde418579c2850", pkgs)
+	if !strings.Contains(opkg, "echo 'arch aarch64_cortex-a53 20' >> /etc/opkg.conf") {
+		t.Errorf("the opkg script does not add the arch:\n%s", opkg)
+	}
+}
