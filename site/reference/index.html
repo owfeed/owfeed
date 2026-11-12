@@ -47,33 +47,50 @@
 
 <p class="kicker">Reference</p>
 <h1>Commands and config</h1>
-<p class="lead">Look-up page. Current for owlab v0.7.1 and owfeed v0.5.8. The authoritative
-config reference is <a href="/schema/v1.json">schema/v1.json</a>, which is generated from the
-code and is what your editor reads.</p>
+<p class="lead">Every owlab and owfeed command, both config files, environment variables, exit
+codes and terms. For package authors and feed maintainers looking up one fact.</p>
 
-<h2>owlab — develop and test</h2>
+<ul>
+  <li><strong>Versions:</strong> Current for owlab v0.7.1 and owfeed v0.5.8.</li>
+  <li><strong>Authoritative config reference:</strong> <a href="/schema/v1.json">schema/v1.json</a>.
+  It is generated from the code, and your editor reads it.</li>
+</ul>
+
+<p>Find it fast:</p>
+<ul>
+  <li><a href="#owlab">owlab commands</a> and <a href="#owlab-test">owlab test assertions</a></li>
+  <li><a href="#owfeed">owfeed commands</a></li>
+  <li><a href="#owlab-yaml">owlab.yaml</a> and <a href="#owfeed-yml">owfeed.yml</a></li>
+  <li><a href="#env">Environment variables</a></li>
+  <li><a href="#exit-codes">owfeed exit codes</a></li>
+  <li><a href="#glossary">Glossary</a></li>
+</ul>
+
+<h2 id="owlab">owlab — develop and test</h2>
 
 <table>
 <tr><th>Command</th><th>Does</th></tr>
-<tr><td><code>owlab up</code></td><td>Build and start the routers. <code>--rebuild</code> throws the old ones away.</td></tr>
-<tr><td><code>owlab down</code></td><td>Stop them. <code>--purge</code> also deletes images and VM disks.</td></tr>
-<tr><td><code>owlab sync</code></td><td>Copy your sources into the running routers and reload LuCI. <code>--watch</code> does it on every save.</td></tr>
-<tr><td><code>owlab build</code></td><td>Build a real <code>.apk</code>/<code>.ipk</code> with the OpenWrt SDK into <code>dist/&lt;arch&gt;/</code>.</td></tr>
-<tr><td><code>owlab test</code></td><td>Start, install, assert, tear down, exit 0 or 1. What CI runs.</td></tr>
-<tr><td><code>owlab install</code></td><td>Install packages on a running router, by file or by name.</td></tr>
-<tr><td><code>owlab shell</code> / <code>exec</code></td><td>Open a shell, or run one command.</td></tr>
-<tr><td><code>owlab logs</code></td><td>Boot and service log. <code>-f</code> follows.</td></tr>
-<tr><td><code>owlab open</code></td><td>Open LuCI in a browser.</td></tr>
-<tr><td><code>owlab status</code></td><td>What is running and on which ports.</td></tr>
-<tr><td><code>owlab releases</code></td><td>Compare your pinned releases against the download servers.</td></tr>
-<tr><td><code>owlab doctor</code></td><td>Check this machine: ports, ssh keys, line endings, QEMU, DNS.</td></tr>
+<tr><td><code>owlab up</code></td><td>Builds and starts the routers. <code>--rebuild</code> throws the old ones away.</td></tr>
+<tr><td><code>owlab down</code></td><td>Stops them. <code>--purge</code> also deletes images and VM disks.</td></tr>
+<tr><td><code>owlab sync</code></td><td>Copies your sources into the running routers and reloads LuCI. <code>--watch</code> does it on every save.</td></tr>
+<tr><td><code>owlab build</code></td><td>Builds a real <code>.apk</code>/<code>.ipk</code> with the OpenWrt SDK into <code>dist/&lt;arch&gt;/</code>.</td></tr>
+<tr><td><code>owlab test</code></td><td>Starts, installs, asserts, tears down, exits 0 or 1. What CI runs.</td></tr>
+<tr><td><code>owlab install</code></td><td>Installs packages on a running router, by file or by name.</td></tr>
+<tr><td><code>owlab shell</code> / <code>exec</code></td><td>Opens a shell, or runs one command.</td></tr>
+<tr><td><code>owlab logs</code></td><td>Shows the boot and service log. <code>-f</code> follows.</td></tr>
+<tr><td><code>owlab open</code></td><td>Opens LuCI in a browser.</td></tr>
+<tr><td><code>owlab status</code></td><td>Shows what is running and on which ports.</td></tr>
+<tr><td><code>owlab releases</code></td><td>Compares your pinned releases against the download servers.</td></tr>
+<tr><td><code>owlab doctor</code></td><td>Checks this machine: ports, ssh keys, line endings, QEMU, DNS.</td></tr>
 </table>
 
-<p>Every command takes router ids; with none, it acts on all of them. <code>--config</code>
-(or <code>-c</code>) works anywhere in the line. <code>test</code>, <code>status</code> and
-<code>releases</code> take <code>--json</code>.</p>
+<ul>
+  <li>Every command takes router ids. With none, it acts on all of them.</li>
+  <li><code>--config</code> (or <code>-c</code>) works anywhere in the line.</li>
+  <li><code>test</code>, <code>status</code> and <code>releases</code> take <code>--json</code>.</li>
+</ul>
 
-<h3>owlab test assertions</h3>
+<h3 id="owlab-test">owlab test assertions</h3>
 
 <pre>owlab test --release 25.12.5 \
   --install 'dist/*/my-app-*' \
@@ -89,45 +106,51 @@ code and is what your editor reads.</p>
 <tr><td><code>http &lt;status&gt; &lt;path&gt;</code></td><td>The page answers with that status and is not an error page. <code>2xx</code> matches a class.</td></tr>
 <tr><td><code>service &lt;name&gt;</code></td><td><code>/etc/init.d/&lt;name&gt; running</code> says so, or ubus does.</td></tr>
 <tr><td><code>package &lt;name&gt;</code></td><td>The router's package manager reports it installed.</td></tr>
-<tr><td><code>uci &lt;path&gt;</code></td><td>The value is set — how you check that a package's <code>uci-defaults</code> really ran.</td></tr>
+<tr><td><code>uci &lt;path&gt;</code></td><td>The value is set. This is how you check that a package's <code>uci-defaults</code> ran.</td></tr>
 <tr><td><code>file &lt;path&gt;</code></td><td>The path exists on the router.</td></tr>
 <tr><td><code>exec &lt;command&gt;</code></td><td>The command exits 0.</td></tr>
 </table>
 
-<p><code>--feed URL</code> with <code>--feed-key FILE</code> installs by name out of a signed
-index instead of from a file. <code>--keep</code> leaves the routers up; <code>--json</code>
-writes a report to stdout.</p>
+<table>
+<tr><th>Flag</th><th>Does</th></tr>
+<tr><td><code>--feed URL</code> with <code>--feed-key FILE</code></td><td>Installs by name out of a signed index instead of from a file.</td></tr>
+<tr><td><code>--keep</code></td><td>Leaves the routers up.</td></tr>
+<tr><td><code>--json</code></td><td>Writes a report to stdout.</td></tr>
+</table>
 
-<h2>owfeed — sign, index, publish</h2>
+<h2 id="owfeed">owfeed — sign, index, publish</h2>
 
 <table>
 <tr><th>Command</th><th>Does</th></tr>
-<tr><td><code>owfeed init</code></td><td>Scaffold <code>owfeed.yml</code> in this directory.</td></tr>
-<tr><td><code>owfeed keygen</code></td><td>Create the feed's signing key. <code>--usign</code> makes a release-manifest key instead.</td></tr>
-<tr><td><code>owfeed lock</code></td><td>Derive the architecture matrix into <code>owfeed.lock</code>. <code>--update</code> prints the diff.</td></tr>
-<tr><td><code>owfeed plan</code></td><td>What a build would produce, offline and before it produces it: version, architectures, and the path of every file. <code>--json</code> for a later job to read.</td></tr>
-<tr><td><code>owfeed build</code></td><td>Package every configured package into <code>dist/&lt;arch&gt;/</code>. Does not compile.</td></tr>
-<tr><td><code>owfeed sign</code></td><td>Add a signature inside each package.</td></tr>
-<tr><td><code>owfeed index</code></td><td>Fan the packages out per architecture and write a signed index in each.</td></tr>
-<tr><td><code>owfeed doctor</code></td><td>Check the built tree. <code>--require-origin</code> demands every package name its source repository; <code>--author-keys DIR</code> demands every package carry a signature by a key pinned in DIR.</td></tr>
-<tr><td><code>owfeed check</code></td><td>Build, sign, index and <code>doctor</code> on keys generated for the run and discarded. Needs no <code>signing:</code> block and leaves nothing behind — what a pull request can verify with no secret in scope.</td></tr>
-<tr><td><code>owfeed smoke</code></td><td>Install the built feed on a real OpenWrt image. <code>--release 24.10</code> for the older line, <code>--arch aarch64_cortex-a53</code> for another architecture (needs QEMU on an x86_64 host).</td></tr>
-<tr><td><code>owfeed verify</code></td><td>Check the published feed from outside, over its documented URL.</td></tr>
-<tr><td><code>owfeed publish</code></td><td>Gate the tree on those checks and hand it to the target. No override flag.</td></tr>
-<tr><td><code>owfeed release</code></td><td>Sign the built packages and write a signed manifest for a feed to consume.</td></tr>
-<tr><td><code>owfeed verify-artifact</code></td><td>Check someone else's release against their signature.</td></tr>
-<tr><td><code>owfeed install-snippet</code></td><td>Print the instructions your subscribers follow. <code>--format sh</code> for commands only.</td></tr>
-<tr><td><code>owfeed releases</code></td><td>What the download server publishes per line, and which format it takes.</td></tr>
+<tr><td><code>owfeed init</code></td><td>Scaffolds <code>owfeed.yml</code> in this directory.</td></tr>
+<tr><td><code>owfeed keygen</code></td><td>Creates the feed's signing key. <code>--usign</code> makes a release-manifest key instead.</td></tr>
+<tr><td><code>owfeed lock</code></td><td>Derives the architecture matrix into <code>owfeed.lock</code>. <code>--update</code> prints the diff.</td></tr>
+<tr><td><code>owfeed plan</code></td><td>Shows what a build would produce, offline and before it produces it: version, architectures, and the path of every file. <code>--json</code> for a later job to read.</td></tr>
+<tr><td><code>owfeed build</code></td><td>Packages every configured package into <code>dist/&lt;arch&gt;/</code>. Does not compile.</td></tr>
+<tr><td><code>owfeed sign</code></td><td>Adds a signature inside each package.</td></tr>
+<tr><td><code>owfeed index</code></td><td>Fans the packages out per architecture and writes a signed index in each.</td></tr>
+<tr><td><code>owfeed doctor</code></td><td>Checks the built tree. <code>--require-origin</code> demands every package name its source repository. <code>--author-keys DIR</code> demands every package carry a signature by a key pinned in DIR.</td></tr>
+<tr><td><code>owfeed check</code></td><td>Runs build, sign, index and <code>doctor</code> on keys generated for the run and discarded. Needs no <code>signing:</code> block and leaves nothing behind. It is what a pull request can verify with no secret in scope.</td></tr>
+<tr><td><code>owfeed smoke</code></td><td>Installs the built feed on a real OpenWrt image. <code>--release 24.10</code> for the older line. <code>--arch aarch64_cortex-a53</code> for another architecture (needs QEMU on an x86_64 host).</td></tr>
+<tr><td><code>owfeed verify</code></td><td>Checks the published feed from outside, over its documented URL.</td></tr>
+<tr><td><code>owfeed publish</code></td><td>Gates the tree on those checks and hands it to the target. No override flag.</td></tr>
+<tr><td><code>owfeed release</code></td><td>Signs the built packages and writes a signed manifest for a feed to consume.</td></tr>
+<tr><td><code>owfeed verify-artifact</code></td><td>Checks someone else's release against their signature.</td></tr>
+<tr><td><code>owfeed install-snippet</code></td><td>Prints the instructions your subscribers follow. <code>--format sh</code> for commands only.</td></tr>
+<tr><td><code>owfeed releases</code></td><td>Shows what the download server publishes per line, and which format it takes.</td></tr>
 </table>
 
-<p>Global flags: <code>-C DIR</code>, <code>--config PATH</code>, <code>--cache DIR</code>,
-<code>--frozen-lock</code>, <code>--no-network</code>, <code>-v</code>.</p>
+<ul>
+  <li><strong>Global flags:</strong> <code>-C DIR</code>, <code>--config PATH</code>,
+  <code>--cache DIR</code>, <code>--frozen-lock</code>, <code>--no-network</code>,
+  <code>-v</code>.</li>
+  <li><strong>Usual order:</strong> <code>build → sign → index → doctor</code>. Each stage takes a
+  directory in and leaves a directory behind.</li>
+  <li><strong>Sign before index:</strong> signing appends bytes. An index written before signing
+  no longer matches the files.</li>
+</ul>
 
-<p>The usual order is <code>build → sign → index → doctor</code>. Each stage takes a directory
-in and leaves a directory behind. Signing appends bytes, so indexing before signing produces an
-index that no longer matches the files.</p>
-
-<h2>owlab.yaml</h2>
+<h2 id="owlab-yaml">owlab.yaml</h2>
 
 <pre>version: 1
 
@@ -156,9 +179,9 @@ routers:
     memory: 512M
     radios: 2                 # vm only — mac80211_hwsim</pre>
 
-<p>Unknown keys are an error by design, so a typo fails at load time instead of being ignored.</p>
+<p>Unknown keys are an error by design. A typo fails at load time instead of being ignored.</p>
 
-<h2>owfeed.yml</h2>
+<h2 id="owfeed-yml">owfeed.yml</h2>
 
 <pre>version: 1
 
@@ -197,44 +220,44 @@ packages:
     i18n: { from: ./po }      # compiles .po into the .lmo LuCI reads
     releases: ["25.12"]       # omit to publish to every line</pre>
 
-<p>Full field list with descriptions: <a href="/schema/v1.json">schema/v1.json</a>. Add this
-line at the top of your config and your editor will complete and validate it:</p>
+<p>Full field list with descriptions: <a href="/schema/v1.json">schema/v1.json</a>. With this
+line at the top of your config, your editor completes and validates it:</p>
 
 <pre># yaml-language-server: $schema=https://owfeed.org/schema/v1.json</pre>
 
-<h2>Environment variables</h2>
+<h2 id="env">Environment variables</h2>
 
 <table>
 <tr><th>Variable</th><th>Used by</th><th>For</th></tr>
 <tr><td><code>OWFEED_SIGN_KEY</code></td><td>owfeed</td><td>The EC key that signs apk indexes and packages.</td></tr>
-<tr><td><code>OWFEED_USIGN_KEY</code></td><td>owfeed</td><td>The usign key that signs opkg indexes. Only a convention — <code>signing.usign-key</code> names whichever variable it likes, and there is no default.</td></tr>
+<tr><td><code>OWFEED_USIGN_KEY</code></td><td>owfeed</td><td>The usign key that signs opkg indexes. The name is only a convention: <code>signing.usign-key</code> names whichever variable it likes, and there is no default.</td></tr>
 <tr><td><code>OWFEED_RELEASE_KEY</code></td><td>owfeed</td><td>The usign key that signs a release manifest.</td></tr>
-<tr><td><code>OWFEED_RELEASE_DATE</code></td><td>owfeed</td><td>Override the manifest timestamp for a reproducible build.</td></tr>
+<tr><td><code>OWFEED_RELEASE_DATE</code></td><td>owfeed</td><td>Overrides the manifest timestamp for a reproducible build.</td></tr>
 <tr><td><code>OWLAB_CONFIG</code></td><td>owlab</td><td>Where <code>owlab.yaml</code> lives.</td></tr>
 <tr><td><code>OWLAB_PUBKEY</code></td><td>owlab</td><td>Which public key to install on routers. Default: every <code>~/.ssh/id_*.pub</code>.</td></tr>
-<tr><td><code>OWLAB_ROOT_PASSWORD</code></td><td>owlab</td><td>Set a root password. Default is none.</td></tr>
+<tr><td><code>OWLAB_ROOT_PASSWORD</code></td><td>owlab</td><td>Sets a root password. Default is none.</td></tr>
 </table>
 
-<h2>owfeed exit codes</h2>
-
-<p>CI can retry an outage. It must never retry a failed check, which is why 7 and 8 are
-different codes.</p>
+<h2 id="exit-codes">owfeed exit codes</h2>
 
 <table>
 <tr><th>Code</th><th>Meaning</th></tr>
 <tr><td>0</td><td>Success</td></tr>
-<tr><td>1</td><td>Internal error — a bug, or something the tool could not classify</td></tr>
+<tr><td>1</td><td>Internal error: a bug, or something the tool could not classify</td></tr>
 <tr><td>2</td><td>Config error</td></tr>
 <tr><td>3</td><td>Build failed</td></tr>
 <tr><td>4</td><td>Key problem</td></tr>
 <tr><td>5</td><td>Index failed</td></tr>
 <tr><td>6</td><td>Publish failed</td></tr>
-<tr><td>7</td><td>A check failed — do not retry. Includes an answer from upstream that a retry cannot change: a 404 for a pinned release, a signature or checksum that does not match, a missing image tag</td></tr>
-<tr><td>8</td><td>Upstream outage — safe to retry. A 5xx, 429, timeout, DNS failure or refused connection that lasted through owfeed's own retries</td></tr>
+<tr><td>7</td><td>A check failed. Do not retry. Includes an answer from upstream that a retry cannot change: a 404 for a pinned release, a signature or checksum that does not match, a missing image tag</td></tr>
+<tr><td>8</td><td>Upstream outage. Safe to retry. A 5xx, 429, timeout, DNS failure or refused connection that lasted through owfeed's own retries</td></tr>
 <tr><td>9</td><td><code>owfeed.lock</code> disagrees with upstream</td></tr>
 </table>
 
-<h2>Glossary</h2>
+<p>Why 7 and 8 are different codes: CI can retry an outage, and it must never retry a failed
+check.</p>
+
+<h2 id="glossary">Glossary</h2>
 
 <dl class="glossary">
 <dt>apk</dt>
@@ -247,7 +270,7 @@ It does not understand any of apk's formats.</dd>
 
 <dt>feed</dt>
 <dd>A directory of packages and signed indexes, served over HTTPS. No server software, no
-database — anything that serves static files will do.</dd>
+database: anything that serves static files will do.</dd>
 
 <dt>index</dt>
 <dd>The file listing every package in a feed with its version and hash. <code>packages.adb</code>
@@ -256,12 +279,12 @@ index is signed, and each package is checked against the hash the index recorded
 
 <dt>noarch / all</dt>
 <dd>Two words for a package that runs on any architecture. apk requires <code>noarch</code> and
-rejects <code>all</code> as uninstallable; opkg has only ever known <code>all</code>. One build
+rejects <code>all</code> as uninstallable. opkg has only ever known <code>all</code>. One build
 therefore writes both <code>dist/noarch/</code> and <code>dist/all/</code>.</dd>
 
 <dt>usign</dt>
 <dd>The ed25519 signing scheme OpenWrt already ships, so a router can verify a signature with
-nothing installed. Used for opkg indexes and release manifests. Keys are looked up by id, which
+nothing installed. Used for opkg indexes and release manifests. Keys are looked up by id. That
 is why the key file's <em>name</em> matters for opkg.</dd>
 
 <dt>conffiles</dt>
@@ -269,12 +292,12 @@ is why the key file's <em>name</em> matters for opkg.</dd>
 is not declared gets replaced by your defaults on every firmware upgrade, silently.</dd>
 
 <dt>.lmo</dt>
-<dd>The compiled translation format LuCI reads. Shipping <code>.po</code> files does nothing —
-point <code>i18n.from:</code> at them and they are compiled during the build.</dd>
+<dd>The compiled translation format LuCI reads. Shipping <code>.po</code> files does nothing.
+Point <code>i18n.from:</code> at them and they are compiled during the build.</dd>
 
 <dt>sysupgrade</dt>
 <dd>A firmware upgrade that keeps a listed set of files. <code>/etc/apk/keys/*.pem</code> and
-your repository list are not in that set by default — list them in
+your repository list are not in that set by default. List them in
 <code>/lib/upgrade/keep.d/&lt;feed&gt;</code>, which sysupgrade reads alongside
 <code>/etc/sysupgrade.conf</code>.</dd>
 
@@ -285,7 +308,8 @@ architecture is the directory, never the filename.</dd>
 
 <dt>-r&lt;n&gt;</dt>
 <dd>The package revision, always last in a version. After <code>~</code> apk reads a commit hash,
-so only hex digits are allowed there — write <code>1.0_beta1</code>, not <code>1.0~beta</code>.</dd>
+so only hex digits are allowed there: <code>1.0_beta1</code> works, <code>1.0~beta</code> does
+not.</dd>
 </dl>
 
 <footer>

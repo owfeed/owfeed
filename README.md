@@ -292,7 +292,7 @@ owfeed verify out      # fetches the published feed over its documented URL
 It catches a redirect apk will not follow and a listed package that is missing or the wrong size.
 Given the tree about to replace it, it also catches a version republished with different contents.
 
-## Things that will bite you
+## Common mistakes owfeed refuses
 
 owfeed refuses each of these. Every one has burned a real maintainer.
 

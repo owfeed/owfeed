@@ -47,10 +47,26 @@
 
 <p class="kicker">Cookbook · 1 of 3</p>
 <h1>Develop and test</h1>
-<p class="lead">Throwaway OpenWrt routers in Docker, so you can see your package running before
-anyone else does. You need Docker and nothing else.</p>
+<p class="lead">In this tutorial we run your LuCI package on throwaway OpenWrt routers in Docker,
+so you see it working before anyone else does. You need Docker and nothing else.</p>
 
-<h2>Start a router</h2>
+<ul>
+  <li>Edit loop: <code>owlab sync --watch</code> copies your sources on every save. No rebuild.</li>
+  <li>Both release lines open side by side: 25.12 (apk) and 24.10 (opkg).</li>
+  <li>One-command check: <code>owlab test</code> exits 0 or 1. CI runs the same command.</li>
+</ul>
+
+<table>
+<tr><th>You want to</th><th>Go to</th></tr>
+<tr><td>Get a router running</td><td><a href="#start">Start a router</a></td></tr>
+<tr><td>See edits live</td><td><a href="#sync">See your changes without rebuilding</a></td></tr>
+<tr><td>Test on 25.12 and 24.10</td><td><a href="#both-lines">Cover both release lines</a></td></tr>
+<tr><td>Fill the router with data</td><td><a href="#fixtures">Make the router look inhabited</a></td></tr>
+<tr><td>Run the check CI runs</td><td><a href="#test">The whole check in one command</a></td></tr>
+<tr><td>Test a kernel module</td><td><a href="#kernel">When a kernel module is involved</a></td></tr>
+</table>
+
+<h2 id="start">Start a router</h2>
 
 <pre>go install owfeed.org/owlab/cmd/owlab@latest
 
@@ -58,17 +74,18 @@ cd my-luci-app
 owlab up                  # start it
 owlab open owrt2512       # LuCI in your browser</pre>
 
-<p>Log in as <code>root</code> with an empty password. The router is disposable — break it, then
-<code>owlab up --rebuild</code>.</p>
+<p>Log in as <code>root</code> with an empty password.</p>
 
-<h2>See your changes without rebuilding</h2>
+<p>The router is disposable. If you break it, run <code>owlab up --rebuild</code>.</p>
+
+<h2 id="sync">See your changes without rebuilding</h2>
 
 <pre>owlab sync --watch</pre>
 
-<p>Copies your sources into the running router on every save and reloads LuCI. This is the loop
-you spend the day in; building a package is for later.</p>
+<p>owlab copies your sources into the running router on every save and reloads LuCI. You spend the
+day in this loop. Building a package comes later.</p>
 
-<p>owlab copies the same directories <code>luci.mk</code> installs — <code>htdocs</code>,
+<p>owlab copies the same directories <code>luci.mk</code> installs: <code>htdocs</code>,
 <code>ucode</code>, <code>luasrc</code>, <code>root</code>. If your package lives in a
 subdirectory, say so:</p>
 
@@ -78,7 +95,7 @@ subdirectory, say so:</p>
     my-package/ucode:  /usr/share/ucode/luci
     my-package/root:   /</pre>
 
-<h2>Cover both release lines</h2>
+<h2 id="both-lines">Cover both release lines</h2>
 
 <pre>version: 1
 routers:
@@ -87,17 +104,17 @@ routers:
   - id: owrt2410
     release: "24.10.8"</pre>
 
-<p>25.12 uses apk, 24.10 uses opkg, and they agree on almost nothing. A package that works on one
-can fail on the other, so both are worth having open.</p>
+<p>25.12 uses apk and 24.10 uses opkg. They agree on almost nothing, so a package that works on one
+can fail on the other. Keep both open.</p>
 
 <div class="note"><strong>Pin exact point releases.</strong> <code>snapshot</code> images and
-<code>snapshot</code> feeds are rebuilt daily and independently, so installs start failing within
+<code>snapshot</code> feeds are rebuilt daily and independently. Installs start failing within
 a day. <code>owlab releases</code> tells you when a pin has fallen behind.</div>
 
-<h2>Make the router look inhabited</h2>
+<h2 id="fixtures">Make the router look inhabited</h2>
 
-<p>An empty router renders almost nothing — no zone badges, no VLANs, no DHCP leases, no tables
-with rows in them. That is a poor place to develop a page against:</p>
+<p>An empty router renders almost nothing: no zone badges, no VLANs, no DHCP leases, no tables with
+rows in them. That is a poor place to develop a page against. Turn on the fixtures:</p>
 
 <pre>defaults:
   fixtures: [all]</pre>
@@ -105,25 +122,30 @@ with rows in them. That is a poor place to develop a page against:</p>
 <p>Individual profiles: <code>networks</code>, <code>clients</code>, <code>wireguard</code>,
 <code>portforwards</code>, <code>system</code>, <code>wifi</code>.</p>
 
-<h2>The whole check in one command</h2>
+<h2 id="test">The whole check in one command</h2>
 
 <pre>owlab test --release 25.12.5 --release 24.10.8 \
   --install 'dist/*/luci-app-mine-*' \
   --assert 'http 200 /cgi-bin/luci/admin/services/mine' \
   --assert 'service mined'</pre>
 
-<p>Starts the routers, installs, asserts, tears down, exits 0 or 1. This is what CI runs, and
-running it locally first is how you find out before the pull request does.</p>
+<p>The command starts the routers, installs, asserts, tears down, and exits 0 or 1.</p>
 
-<p>Two things it does that a hand-written <code>curl</code> does not. It <strong>logs into LuCI
-first</strong>, because every admin page answers a redirect otherwise — which is why the obvious
-check reports 403 on a perfectly healthy page. And it <strong>fails a 200 whose body is an error
-page</strong>: LuCI's dispatcher returns 200 with the traceback in it when it catches an
-exception.</p>
+<p>CI runs this same command. Run it locally first, and you find out before the pull request
+does.</p>
 
 <p>Full list of assertion kinds: <a href="/reference/">Commands and config</a>.</p>
 
-<h2>When a kernel module is involved</h2>
+<h3>What it does that a hand-written curl does not</h3>
+
+<ul>
+  <li><strong>It logs into LuCI first.</strong> Without a login, every admin page answers with a
+      redirect. That is why the obvious check reports 403 on a perfectly healthy page.</li>
+  <li><strong>It fails a 200 whose body is an error page.</strong> When LuCI's dispatcher catches
+      an exception, it returns 200 with the traceback in it.</li>
+</ul>
+
+<h2 id="kernel">When a kernel module is involved</h2>
 
 <pre>routers:
   - id: real
@@ -132,9 +154,13 @@ exception.</p>
     packages: ["+kmod-nft-nat"]</pre>
 
 <p>A container shares the host kernel, so <code>kmod-*</code> packages install and do nothing.
-<code>fidelity: vm</code> is QEMU with OpenWrt's own kernel — first start takes about a minute and
-a half, after that twenty seconds. It also gets simulated radios, so the wireless pages show a
-router instead of a config file.</p>
+<code>fidelity: vm</code> is QEMU with OpenWrt's own kernel.</p>
+
+<ul>
+  <li>First start: about a minute and a half. After that: twenty seconds.</li>
+  <li>Simulated radios come with it, so the wireless pages show a router instead of a config
+      file.</li>
+</ul>
 
 <footer>
 <p>Next: <a href="/cookbook/release/">Build and release</a> — turning what works into signed

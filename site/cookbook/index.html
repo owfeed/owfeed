@@ -65,6 +65,27 @@ stages, each its own page, each useful without the next.</p>
   </a>
 </div>
 
+<h2>Where to stop</h2>
+
+<table>
+<tr><th>Stage</th><th>Choose it when</th><th>Why it is enough</th></tr>
+<tr><td><strong>Stop after 1</strong></td><td>The package is not released yet.</td><td>owlab holds no keys and publishes nothing. It exists to answer "does this actually work on 24.10".</td></tr>
+<tr><td><strong>Stop after 2</strong></td><td>Your package is installed occasionally, by people who can paste a command.</td><td>A signed release asks your users for nothing but a signature check. It does not make anyone's key a trust anchor on their router.</td></tr>
+<tr><td><strong>Go to 3</strong></td><td>You want <code>apk upgrade</code> to work.</td><td>That is the one thing a feed does that a release cannot.</td></tr>
+</table>
+
+<p><a href="/">The overview</a> argues the case for not running a feed where a release would
+do.</p>
+
+<h2>What each stage needs</h2>
+
+<table>
+<tr><th>Stage</th><th>Requires</th></tr>
+<tr><td>Develop and test</td><td>Docker. Nothing else.</td></tr>
+<tr><td>Build and release</td><td>Two keys, made once. No toolchain to install: the apk tools are fetched from the OpenWrt SDK and verified against a pinned key.</td></tr>
+<tr><td>Get into a feed</td><td>A signed release, and a feed willing to carry it.</td></tr>
+</table>
+
 <h2>The whole path, in eight commands</h2>
 
 <pre># 1 — while you work
@@ -80,28 +101,6 @@ owfeed release
 
 # 3 — once, to join a feed
 #     open an issue with your repository, a tag and your public keys</pre>
-
-<h2>Where to stop</h2>
-
-<p><strong>Stop after 1</strong> if the package is not released yet. owlab holds no keys and
-publishes nothing; it exists to answer "does this actually work on 24.10".</p>
-
-<p><strong>Stop after 2</strong> if your package is installed occasionally, by people who can
-paste a command. A signed release asks your users for nothing but a signature check, and it does
-not make anyone's key a trust anchor on their router.</p>
-
-<p><strong>Go to 3</strong> when you want <code>apk upgrade</code> to work. That is the one thing
-a feed does that a release cannot — and <a href="/">the overview</a> argues the case for not
-running a feed where a release would do.</p>
-
-<h2>What each stage needs</h2>
-
-<table>
-<tr><th>Stage</th><th>Requires</th></tr>
-<tr><td>Develop and test</td><td>Docker. Nothing else.</td></tr>
-<tr><td>Build and release</td><td>Two keys, made once. No toolchain to install: the apk tools are fetched from the OpenWrt SDK and verified against a pinned key.</td></tr>
-<tr><td>Get into a feed</td><td>A signed release, and a feed willing to carry it.</td></tr>
-</table>
 
 <footer>
 <p>Reference: <a href="/reference/">every command and config field</a> ·

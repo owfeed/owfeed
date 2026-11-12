@@ -46,9 +46,17 @@
 <main class="page">
 
 <h1>Ship an OpenWrt package without building it 35 times</h1>
-<p class="lead">Two Go binaries. One develops and tests your package on throwaway routers; the
-other signs it and turns a directory into a feed users can <code>apk add</code>. They work on
-both release lines — apk on 25.12 and later, opkg on 24.10 and earlier.</p>
+<p class="lead">Two Go binaries for people who publish OpenWrt packages and people who install
+them. One tests your package on throwaway routers. The other signs it and turns a directory into
+a feed users can <code>apk add</code>.</p>
+
+<ul>
+  <li><strong>Both release lines:</strong> apk on 25.12 and later, opkg on 24.10 and earlier.</li>
+  <li><strong>No 35 builds:</strong> a noarch package across 35 architectures takes one pass,
+  about 25 seconds.</li>
+  <li><strong>One shared format:</strong> a directory called <code>dist/</code>, one subdirectory
+  per architecture.</li>
+</ul>
 
 <h2>Which of these are you?</h2>
 <div class="forks">
@@ -74,9 +82,11 @@ both release lines — apk on 25.12 and later, opkg on 24.10 and earlier.</p>
 <tr><td><code>owfeed</code></td><td>Can anyone trust these bytes? Signs packages, builds a signed index, checks the result before it goes out.</td><td>Yes</td></tr>
 </table>
 
-<p>Neither depends on the other. They agree on one thing: a directory called <code>dist/</code>
-with one subdirectory per architecture. Anything that fills it correctly works with everything
-downstream — including a plain OpenWrt SDK build.</p>
+<p>Neither tool depends on the other. They agree on one thing: the <code>dist/</code> directory,
+with one subdirectory per architecture.</p>
+
+<p>Anything that fills <code>dist/</code> correctly works with everything downstream. That
+includes a plain OpenWrt SDK build.</p>
 
 <h2>Install</h2>
 
@@ -98,18 +108,14 @@ chmod +x owfeed-linux-amd64 &amp;&amp; sudo mv owfeed-linux-amd64 /usr/local/bin
 <table>
 <tr><th>For</th><th>Requirement</th></tr>
 <tr><td><code>owlab</code>, anything</td><td>Docker, Podman, OrbStack, Colima or Rancher Desktop, with Compose v2</td></tr>
-<tr><td><code>owlab</code> with <code>fidelity: vm</code></td><td>QEMU as well — <code>brew install qemu</code></td></tr>
+<tr><td><code>owlab</code> with <code>fidelity: vm</code></td><td>QEMU as well: <code>brew install qemu</code></td></tr>
 <tr><td><code>owfeed build/sign/index/publish</code></td><td>Nothing. The apk toolchain is fetched from the OpenWrt SDK and verified against a pinned key</td></tr>
 <tr><td><code>owfeed smoke</code>, and <code>owfeed build</code> on macOS</td><td>Docker</td></tr>
 </table>
 
 <h2>Do you need a feed at all?</h2>
 
-<p>Probably not, and it is worth deciding before you build one.</p>
-
-<p>A key in <code>/etc/apk/keys</code> is a trust anchor for <strong>every package name</strong>,
-not just yours. A feed whose key leaks can offer a higher version of <code>dropbear</code> and
-win, and apk has no revocation.</p>
+<p>Probably not. Decide before you build one.</p>
 
 <table>
 <tr><th>Your situation</th><th>What to do</th></tr>
@@ -118,12 +124,19 @@ win, and apk has no revocation.</p>
 <tr><td>You want the second without running one</td><td>Ask <a href="https://github.com/owfeed/owfeed-packages">owfeed-packages</a> to carry your package.</td></tr>
 </table>
 
+<h3>Why a feed key is a risk</h3>
+
+<p>A key in <code>/etc/apk/keys</code> is a trust anchor for <strong>every package name</strong>,
+not only yours. A feed whose key leaks can offer a higher version of <code>dropbear</code> and
+win. apk has no revocation.</p>
+
 <h2>Why not the OpenWrt SDK action?</h2>
 
 <p><code>openwrt/gh-action-sdk</code> compiles a package from source. owfeed packages one that is
-already built. Most third-party packages — themes, LuCI apps, scripts, static binaries — do not
-need compiling at all, and for those the SDK is 35 builds to produce something a single pass
-could have made.</p>
+already built.</p>
+
+<p>Most third-party packages need no compiling: themes, LuCI apps, scripts, static binaries. For
+those, the SDK runs 35 builds to produce what a single pass could have made.</p>
 
 <table>
 <tr><th></th><th>gh-action-sdk</th><th>owfeed</th></tr>
@@ -133,15 +146,15 @@ could have made.</p>
 <tr><td>Proof it installs</td><td>—</td><td><code>owfeed smoke</code>, on a real image</td></tr>
 </table>
 
-<p>If your package is compiled C, use the SDK — then hand its output to owfeed.</p>
+<p>If your package is compiled C, use the SDK. Then hand its output to owfeed.</p>
 
 <h2>Read next</h2>
 <ul>
-  <li><a href="/cookbook/">Ship your package</a> — build, test, sign, publish, step by step</li>
-  <li><a href="/reference/">Commands and config</a> — every command, the config fields, a glossary</li>
-  <li><a href="/schema/v1.json"><code>schema/v1.json</code></a> — the <code>owfeed.yml</code> schema, generated from the code</li>
-  <li><a href="https://github.com/owfeed/owfeed/blob/main/docs/ECOSYSTEM.md">ECOSYSTEM.md</a> — where the boundary between the tools runs, and why</li>
-  <li><a href="https://github.com/owfeed/owfeed/blob/main/docs/apk-behaviour.md">apk-behaviour.md</a> — what apk and opkg actually do, with reproductions</li>
+  <li><a href="/cookbook/">Ship your package</a>: build, test, sign, publish, step by step</li>
+  <li><a href="/reference/">Commands and config</a>: every command, the config fields, a glossary</li>
+  <li><a href="/schema/v1.json"><code>schema/v1.json</code></a>: the <code>owfeed.yml</code> schema, generated from the code</li>
+  <li><a href="https://github.com/owfeed/owfeed/blob/main/docs/ECOSYSTEM.md">ECOSYSTEM.md</a>: where the boundary between the tools runs, and why</li>
+  <li><a href="https://github.com/owfeed/owfeed/blob/main/docs/apk-behaviour.md">apk-behaviour.md</a>: what apk and opkg do, with reproductions</li>
 </ul>
 
 <footer>

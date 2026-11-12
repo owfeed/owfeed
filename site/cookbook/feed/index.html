@@ -47,60 +47,84 @@
 
 <p class="kicker">Cookbook · 3 of 3</p>
 <h1>Get into a feed</h1>
-<p class="lead">A release gives users a download. A feed gives them <code>apk upgrade</code> — the
-only path that keeps working after they have installed once. This is what
-<a href="https://github.com/owfeed/owfeed-packages">owfeed-packages</a> asks for; another feed
-will differ in detail, not in shape.</p>
+<p class="lead">In this tutorial we get your signed release into a feed, so users get
+<code>apk upgrade</code>. A release gives users a download. A feed gives them
+<code>apk upgrade</code>: the only path that keeps working after they have installed once.</p>
 
-<h2>Two things it requires</h2>
+<p>This is what <a href="https://github.com/owfeed/owfeed-packages">owfeed-packages</a> asks for.
+Another feed will differ in detail, not in shape.</p>
 
-<p><strong>Your packages must be signed with your own key</strong>, and its public half is pinned
-in the feed. A feed that cannot attribute a package will not publish it — the check is in the
-pipeline, not in the prose: <code>owfeed doctor</code> fails an unsigned package and the tree
-publishes without it.</p>
+<ul>
+  <li>Sign your packages with your own key (<a href="/cookbook/release/">step 2</a>) and send
+      <code>author.pub.pem</code>.</li>
+  <li>Publish a signed <code>owfeed release</code> manifest. Updates then land within the hour,
+      unattended.</li>
+  <li>Open an issue. A bot checks it, a person reviews your key, and after that every tag is picked
+      up automatically.</li>
+  <li>You stay responsible for the package. A feed distributes; it does not review.</li>
+</ul>
 
-<p>This is <a href="/cookbook/release/">step 2</a>, so if you followed it you are done. Send
-<code>author.pub.pem</code> with the request.</p>
+<table>
+<tr><th>You want to</th><th>Go to</th></tr>
+<tr><td>Know what the feed requires</td><td><a href="#requirements">Two things it requires</a></td></tr>
+<tr><td>Get updates without manual review</td><td><a href="#manifest">Publish a signed manifest</a></td></tr>
+<tr><td>Send the request</td><td><a href="#request">The request</a></td></tr>
+<tr><td>Know what a person still reviews</td><td><a href="#manual-review">What automation will not do on its own</a></td></tr>
+<tr><td>Know your obligations</td><td><a href="#terms">What you are agreeing to</a></td></tr>
+<tr><td>Test the install from the feed</td><td><a href="#channel">Check that the channel works</a></td></tr>
+<tr><td>Add badges and point users at the feed</td><td><a href="#badges">Show it in your README</a> · <a href="#users">What your users then do</a></td></tr>
+</table>
 
-<p><strong>Your description says what the package is, not what it is for.</strong> It is shown by
-<code>apk info</code> and travels into the index — factual, technical, under 512 bytes.</p>
+<h2 id="requirements">Two things it requires</h2>
 
-<h2>Publish a signed manifest, and updates land unattended</h2>
+<ol>
+  <li><p><strong>Your packages must be signed with your own key</strong>, and its public half is
+      pinned in the feed. A feed that cannot attribute a package will not publish it.</p>
+      <p>The check is in the pipeline, not in the prose: <code>owfeed doctor</code> fails an
+      unsigned package and the tree publishes without it.</p>
+      <p>This is <a href="/cookbook/release/">step 2</a>, so if you followed it you are done. Send
+      <code>author.pub.pem</code> with the request.</p></li>
+  <li><p><strong>Your description says what the package is, not what it is for.</strong>
+      <code>apk info</code> shows it, and it travels into the index. Keep it factual, technical,
+      under 512 bytes.</p></li>
+</ol>
 
-<p>Three shapes, and which one you are in decides how much a person has to do for every future
+<h2 id="manifest">Publish a signed manifest, and updates land unattended</h2>
+
+<p>You publish one of three shapes. It decides how much a person has to do for every future
 release:</p>
 
 <table>
 <tr><th>What you publish</th><th>What the signature covers</th><th>Automatic updates</th></tr>
-<tr><td><code>owfeed release</code> manifest</td><td>the whole inventory — every file, its size and hash, plus the repository and tag</td><td><strong>yes</strong></td></tr>
+<tr><td><code>owfeed release</code> manifest</td><td>the whole inventory: every file, its size and hash, plus the repository and tag</td><td><strong>yes</strong></td></tr>
 <tr><td>signed <code>.apk</code> assets</td><td>each asset, but not the list of them</td><td>yes, while the set of files is unchanged</td></tr>
-<tr><td>bare binaries and checksums</td><td>nothing — a checksum says the download was not corrupted, never who produced it</td><td><strong>never</strong></td></tr>
+<tr><td>bare binaries and checksums</td><td>nothing: a checksum says the download was not corrupted, never who produced it</td><td><strong>never</strong></td></tr>
 </table>
 
-<p>That is the honest reason to publish a manifest: it is one command, and an update then lands
-within the hour instead of waiting for somebody to read a notification.</p>
+<p>That is the honest reason to publish a manifest. It is one command, and an update then lands
+within the hour. Without it, the update waits for somebody to read a notification.</p>
 
-<h2>The request</h2>
+<h2 id="request">The request</h2>
 
 <ol class="steps">
-<li><strong>Publish a release with a signed manifest</strong> — <a href="/cookbook/release/">step
+<li><strong>Publish a release with a signed manifest</strong>: <a href="/cookbook/release/">step
 2</a>. The feed verifies it before touching anything.</li>
-<li><strong>Open an issue</strong> from the <em>Request package publication</em> template:
-repository, a tag, your public keys and their ids.</li>
-<li><strong>A bot checks it within a minute</strong> — the release exists, the manifest verifies
-against the key you claim, the format is one the feed reads. It says what is wrong, if
-anything.</li>
-<li><strong>A person reviews the key.</strong> The only manual step, and not skippable: pinning a
-key is the entire trust decision, and their name is on the merge.</li>
+<li><strong>Open an issue</strong> from the <em>Request package publication</em> template. Give
+the repository, a tag, your public keys and their ids.</li>
+<li><strong>A bot checks it within a minute.</strong> It checks that the release exists, the
+manifest verifies against the key you claim, and the format is one the feed reads. If anything is
+wrong, the bot says what.</li>
+<li><strong>A person reviews the key.</strong> This is the only manual step, and it cannot be
+skipped. Pinning a key is the entire trust decision, and the reviewer's name is on the merge.</li>
 <li><strong>After that it is automatic.</strong> Every tag you push is picked up within the
 hour.</li>
 </ol>
 
-<h2>What automation will not do on its own</h2>
+<h2 id="manual-review">What automation will not do on its own</h2>
 
-<p>Even with everything in place, a person still looks at these — because a signature answers
-<em>did the author publish this</em> and not <em>should this go out unread</em>. An upstream whose
-release key is stolen signs perfectly:</p>
+<p>Even with everything in place, a person still looks at the changes below. A signature answers
+<em>did the author publish this</em>, not <em>should this go out unread</em>. An upstream whose
+release key is stolen signs perfectly.</p>
 
 <ul>
   <li><strong>A major version change</strong>, where upstream changes what the package is.</li>
@@ -111,18 +135,18 @@ release key is stolen signs perfectly:</p>
   <li><strong>Anything under <code>keys/</code></strong>, ever.</li>
 </ul>
 
-<h2>What you are agreeing to</h2>
+<h2 id="terms">What you are agreeing to</h2>
 
-<p>A feed distributes; it does not review. Asking it to carry your package means you assert, and
+<p>A feed distributes; it does not review. When you ask it to carry your package, you assert, and
 remain responsible for:</p>
 
 <ul>
-  <li><strong>the right to have it distributed</strong> — the licence permits it, its conditions
+  <li><strong>the right to have it distributed</strong>: the licence permits it, its conditions
       are met, no trademark stands in the way;</li>
-  <li><strong>what is inside it</strong> — contents, behaviour, security, lawfulness;</li>
-  <li><strong>the truth of its metadata</strong> — the declared licence, description and upstream
+  <li><strong>what is inside it</strong>: contents, behaviour, security, lawfulness;</li>
+  <li><strong>the truth of its metadata</strong>: the declared licence, description and upstream
       URL are your assertions, carried through unchanged;</li>
-  <li><strong>answering reports about it</strong> — bug reports, security reports and complaints
+  <li><strong>answering reports about it</strong>: bug reports, security reports and complaints
       go to you.</li>
 </ul>
 
@@ -131,7 +155,7 @@ somebody else's feed. The full terms are in
 <a href="https://github.com/owfeed/owfeed-packages/blob/main/CONTRIBUTING.md">the feed's
 CONTRIBUTING</a>.</p>
 
-<h2>Check that the channel works, not just the package</h2>
+<h2 id="channel">Check that the channel works, not only the package</h2>
 
 <pre>owlab test --release 25.12.5 \
   --feed 'https://repo.owfeed.org/releases/25.12/x86_64/packages.adb' \
@@ -140,26 +164,36 @@ CONTRIBUTING</a>.</p>
   --assert 'http 200 /cgi-bin/luci/admin/services/mine'</pre>
 
 <p>Installing a file proves the package works. Installing it <strong>by name</strong> out of a
-signed index proves the channel does — that the index parses, the URL does not redirect, and the
-key on the router matches the one that signed it. A file install cannot fail in any of those
-ways, so it cannot detect them.</p>
+signed index proves the channel works:</p>
 
-<h2>Show it in your README</h2>
+<ul>
+  <li>the index parses;</li>
+  <li>the URL does not redirect;</li>
+  <li>the key on the router matches the one that signed it.</li>
+</ul>
 
-<p>Once a feed carries your package it publishes two badges for it, generated from the index it
-just built — so they cannot claim a version nobody can install:</p>
+<p>A file install cannot fail in any of those ways, so it cannot detect them.</p>
+
+<h2 id="badges">Show it in your README</h2>
+
+<p>Once a feed carries your package, it publishes two badges for it. The feed generates them from
+the index it built, so they cannot claim a version nobody can install:</p>
 
 <pre>[![owfeed](https://img.shields.io/endpoint?url=https://repo.owfeed.org/badge/my-app.json)](https://owfeed.org/install/)
 [![owfeed](https://img.shields.io/endpoint?url=https://repo.owfeed.org/badge/my-app-releases.json)](https://owfeed.org/install/)</pre>
 
-<p>The first shows the version the feed serves; the second, the release lines it serves it on.</p>
+<ul>
+  <li>The first shows the version the feed serves.</li>
+  <li>The second shows the release lines it serves it on.</li>
+</ul>
 
-<h2>What your users then do</h2>
+<h2 id="users">What your users then do</h2>
 
-<p>One command, and it is the same for every feed that runs owfeed:
-<code>wget -qO- &lt;feed&gt;/subscribe.sh | sh</code>. Point them at
-<a href="/install/">the install page</a> rather than writing your own, which is how a documented
-URL drifts from a working one.</p>
+<p>Your users run one command, the same for every feed that runs owfeed:
+<code>wget -qO- &lt;feed&gt;/subscribe.sh | sh</code>.</p>
+
+<p>Point them at <a href="/install/">the install page</a> rather than writing your own. Your own
+copy is how a documented URL drifts from a working one.</p>
 
 <footer>
 <p>A worked example, end to end:

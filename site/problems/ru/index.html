@@ -47,69 +47,82 @@
 
 <p class="kicker">Разбор проблем</p>
 <h1>Если сломалось</h1>
-<p class="lead">Разобрано по тому, что вы видите. Начните с <code>owfeed doctor</code> или
-<code>owlab doctor</code>: обе печатают пронумерованные находки, в каждой сказано, что упало,
-какая команда упала и что делать.</p>
+<p class="lead">Как исправить проблемы с фидом и пакетами, по тому, что вы видите. Для владельцев
+роутеров, авторов пакетов и тех, кто держит фид.</p>
 
-<h2>Установка на роутер</h2>
+<ul>
+  <li><strong>Начните с doctor:</strong> <code>owfeed doctor</code> или
+  <code>owlab doctor</code>.</li>
+  <li>Обе печатают пронумерованные находки: что упало, какая команда упала и что делать.</li>
+</ul>
+
+<p>Быстрый переход:</p>
+<ul>
+  <li><a href="#router">Установка на роутер</a></li>
+  <li><a href="#build">Сборка и упаковка</a></li>
+  <li><a href="#publish">Публикация фида</a></li>
+  <li><a href="#owlab">Тестовые роутеры (owlab)</a></li>
+</ul>
+
+<h2 id="router">Установка на роутер</h2>
 
 <table>
-<tr><th>Что видно</th><th>Причина и что делать</th></tr>
-<tr><td><code>UNTRUSTED signature</code> после обновления прошивки</td><td>Ключа больше нет. Сам по себе <code>/etc/apk/keys/*.pem</code> не переживает sysupgrade. Поставьте ключ заново и перечислите его вместе с файлом репозитория в <code>/lib/upgrade/keep.d/&lt;feed&gt;</code>, который sysupgrade читает наравне с <code>/etc/sysupgrade.conf</code>.</td></tr>
-<tr><td>apk просит <code>--allow-untrusted</code></td><td>Индекс не подписан ни одним ключом, которому роутер доверяет. Проверьте, что файл ключа лежит в <code>/etc/apk/keys/</code> и что вы смотрите на нужный фид. Флаг не передавайте: он отключает ровно ту проверку, ради которой ставился ключ.</td></tr>
-<tr><td>Ничего не качается, HTTPS не работает</td><td>Стоковый образ не умеет ходить по HTTPS. Сначала <code>apk add ca-bundle libustream-mbedtls</code>.</td></tr>
-<tr><td>URL фида отдаёт 404 или пустоту</td><td>apk не ходит по редиректам (<a href="https://github.com/openwrt/openwrt/issues/17180">openwrt#17180</a>). Если фид переехал, впишите конечный URL. Для apk это URL <em>файла</em> индекса, для opkg — <em>каталога</em>.</td></tr>
-<tr><td>Пакет никогда не обновляется</td><td>Его поставили файлом. <code>apk add ./file.apk</code> пишет пин на хеш содержимого в <code>/etc/apk/world</code>, и пин переживает sysupgrade. Удалите пакет, добавьте репозиторий, поставьте по имени.</td></tr>
-<tr><td>Пакеты пропали после Attended Sysupgrade</td><td>Так и задумано. <code>owut</code> не передаёт сторонние репозитории, а <code>repository_allow_list</code> на сервере пуст по умолчанию. Добавьте фид и поставьте пакеты заново.</td></tr>
-<tr><td><code>breaks: world[...]</code> на каждой установке</td><td>Rootfs и фид разных точечных релизов. Закрепите оба на одном и том же.</td></tr>
+<tr><th>Что видно</th><th>Причина</th><th>Что делать</th></tr>
+<tr><td><code>UNTRUSTED signature</code> после обновления прошивки</td><td>Ключа больше нет. Сам по себе <code>/etc/apk/keys/*.pem</code> не переживает sysupgrade.</td><td>Поставьте ключ заново. Затем перечислите его вместе с файлом репозитория в <code>/lib/upgrade/keep.d/&lt;feed&gt;</code>, который sysupgrade читает наравне с <code>/etc/sysupgrade.conf</code>.</td></tr>
+<tr><td>apk просит <code>--allow-untrusted</code></td><td>Индекс не подписан ни одним ключом, которому роутер доверяет.</td><td>Проверьте, что файл ключа лежит в <code>/etc/apk/keys/</code> и что вы смотрите на нужный фид. Флаг не передавайте: он отключает ровно ту проверку, ради которой ставился ключ.</td></tr>
+<tr><td>Ничего не качается, HTTPS не работает</td><td>Стоковый образ не умеет ходить по HTTPS.</td><td>Сначала выполните <code>apk add ca-bundle libustream-mbedtls</code>.</td></tr>
+<tr><td>URL фида отдаёт 404 или пустоту</td><td>apk не ходит по редиректам (<a href="https://github.com/openwrt/openwrt/issues/17180">openwrt#17180</a>).</td><td>Если фид переехал, впишите конечный URL. Для apk это URL <em>файла</em> индекса, для opkg — <em>каталога</em>.</td></tr>
+<tr><td>Пакет никогда не обновляется</td><td>Его поставили файлом. <code>apk add ./file.apk</code> пишет пин на хеш содержимого в <code>/etc/apk/world</code>, и пин переживает sysupgrade.</td><td>Удалите пакет, добавьте репозиторий, поставьте по имени.</td></tr>
+<tr><td>Пакеты пропали после Attended Sysupgrade</td><td>Так и задумано. <code>owut</code> не передаёт сторонние репозитории, а <code>repository_allow_list</code> на сервере пуст по умолчанию.</td><td>Добавьте фид и поставьте пакеты заново.</td></tr>
+<tr><td><code>breaks: world[...]</code> на каждой установке</td><td>Rootfs и фид разных точечных релизов.</td><td>Закрепите оба на одном и том же.</td></tr>
 </table>
 
-<h2>Сборка и упаковка</h2>
+<h2 id="build">Сборка и упаковка</h2>
 
 <table>
-<tr><th>Что видно</th><th>Причина и что делать</th></tr>
-<tr><td>apk считает пакет неустановимым</td><td><code>arch: all</code>. apk требует <code>noarch</code>. В Makefile пишите <code>LUCI_PKGARCH:=all</code> и дайте сборке перевести, либо укажите <code>arch: noarch</code> в <code>owfeed.yml</code>.</td></tr>
-<tr><td>Ключ не принимается</td><td>Это PEM в формате PKCS#8. <code>openssl genpkey -algorithm EC</code> пишет не ту форму, работает только SEC1. Делайте ключ через <code>owfeed keygen</code>.</td></tr>
-<tr><td>Версия отвергнута</td><td>После <code>~</code> apk читает хеш коммита, там допустимы только шестнадцатеричные цифры. Пишите <code>1.0_beta1</code>, а не <code>1.0~beta</code>. <code>-r&lt;n&gt;</code> идёт последним.</td></tr>
-<tr><td>Индекс не сходится с пакетами</td><td>Индекс собран до подписи. Подпись дописывает байты. Сначала <code>sign</code>, потом <code>index</code>.</td></tr>
-<tr><td>Переводы не появляются</td><td>LuCI читает скомпилированные <code>.lmo</code> и игнорирует <code>.po</code>. Укажите на каталоги переводов <code>i18n.from:</code>, и owfeed их скомпилирует.</td></tr>
-<tr><td>Настройки пользователя затираются на каждом обновлении</td><td>Файл везётся пакетом, но не объявлен в <code>conffiles:</code>. Объявите каждый <code>/etc/config/*</code>, который ставит пакет.</td></tr>
-<tr><td>Без минификации работает, после настоящей сборки ломается</td><td><code>luci.mk</code> минифицирует JS и CSS, а <code>owlab sync</code> нет. Перед релизом прогоните <code>owlab build</code>.</td></tr>
-<tr><td>Пакет отсутствует в одной из линий релизов</td><td><code>owfeed doctor</code> читает дерево и не видит того, чего в нём не написали. Сверяйте собранное дерево со своим конфигом — для этого у фида есть отдельная проверка.</td></tr>
+<tr><th>Что видно</th><th>Причина</th><th>Что делать</th></tr>
+<tr><td>apk считает пакет неустановимым</td><td><code>arch: all</code>. apk требует <code>noarch</code>.</td><td>В Makefile пишите <code>LUCI_PKGARCH:=all</code> и дайте сборке перевести. Либо укажите <code>arch: noarch</code> в <code>owfeed.yml</code>.</td></tr>
+<tr><td>Ключ не принимается</td><td>Это PEM в формате PKCS#8. <code>openssl genpkey -algorithm EC</code> пишет не ту форму, работает только SEC1.</td><td>Делайте ключ через <code>owfeed keygen</code>.</td></tr>
+<tr><td>Версия отвергнута</td><td>После <code>~</code> apk читает хеш коммита, там допустимы только шестнадцатеричные цифры.</td><td>Пишите <code>1.0_beta1</code>, а не <code>1.0~beta</code>. <code>-r&lt;n&gt;</code> идёт последним.</td></tr>
+<tr><td>Индекс не сходится с пакетами</td><td>Индекс собран до подписи. Подпись дописывает байты.</td><td>Сначала <code>sign</code>, потом <code>index</code>.</td></tr>
+<tr><td>Переводы не появляются</td><td>LuCI читает скомпилированные <code>.lmo</code> и игнорирует <code>.po</code>.</td><td>Укажите на каталоги переводов <code>i18n.from:</code>. owfeed их скомпилирует.</td></tr>
+<tr><td>Настройки пользователя затираются на каждом обновлении</td><td>Файл везётся пакетом, но не объявлен в <code>conffiles:</code>.</td><td>Объявите каждый <code>/etc/config/*</code>, который ставит пакет.</td></tr>
+<tr><td>Без минификации работает, после настоящей сборки ломается</td><td><code>luci.mk</code> минифицирует JS и CSS, а <code>owlab sync</code> нет.</td><td>Перед релизом прогоните <code>owlab build</code>.</td></tr>
+<tr><td>Пакет отсутствует в одной из линий релизов</td><td><code>owfeed doctor</code> читает дерево и не видит того, чего в нём не написали.</td><td>Сверяйте собранное дерево со своим конфигом. Для этого у фида есть отдельная проверка.</td></tr>
 </table>
 
-<h2>Публикация фида</h2>
+<h2 id="publish">Публикация фида</h2>
 
 <table>
-<tr><th>Что видно</th><th>Причина и что делать</th></tr>
-<tr><td><code>$OWFEED_SIGN_KEY is empty</code></td><td>Секрета нет или job стартовал раньше, чем секрет появился. Учтите: вызывающий workflow не может прочитать секрет окружения, поэтому ключи подписи должны быть секретами репозитория или организации.</td></tr>
-<tr><td>OWF513: у опубликованной версии другое содержимое</td><td>Пакет изменился без поднятия версии либо сборка перестала быть воспроизводимой. Не публикуйте поверх — поднимите ревизию.</td></tr>
-<tr><td>OWF514: с живого сайта пропал <code>.nojekyll</code></td><td><code>actions/upload-pages-artifact</code> с четвёртой версии выбрасывает файлы с точкой. Поставьте <code>include-hidden-files: true</code>, иначе Pages прогонит по фиду Jekyll и удалит все пути, начинающиеся с точки или подчёркивания.</td></tr>
-<tr><td>Деплой Pages падает на правах</td><td><code>actions/deploy-pages</code> требует <code>actions: read</code>, а блок <code>permissions:</code> молча отбирает это право, если перечисляет только другие.</td></tr>
-<tr><td><code>owfeed doctor</code> проходит, а <code>smoke</code> падает</td><td>Дерево согласовано, но роутер его не принимает. Смотрите вывод контейнера: обычно это зависимость, которая не разрешается на стоковом образе, или файл, установленный туда, куда никто не смотрит.</td></tr>
-<tr><td>Документированный URL установки отдаёт 404</td><td>README разошёлся с фидом. Генерируйте его: <code>owfeed install-snippet</code>. <code>doctor</code> сверяет одно с другим.</td></tr>
-<tr><td>Сборка падает из-за устаревшего lock-файла</td><td>Апстрим добавил или убрал архитектуру. Выполните <code>owfeed lock --update</code> и прочитайте разницу, прежде чем коммитить.</td></tr>
+<tr><th>Что видно</th><th>Причина</th><th>Что делать</th></tr>
+<tr><td><code>$OWFEED_SIGN_KEY is empty</code></td><td>Секрета нет или job стартовал раньше, чем секрет появился. Вызывающий job не может прочитать секрет окружения.</td><td>Храните ключи как секреты окружения <code>feed</code>: его объявляет publish-job в <code>feed.yml</code> и читает их напрямую. Ключи уровня репозитория передаются секретами <code>sign-key</code> и <code>usign-key</code>.</td></tr>
+<tr><td>OWF513: у опубликованной версии другое содержимое</td><td>Пакет изменился без поднятия версии либо сборка перестала быть воспроизводимой.</td><td>Не публикуйте поверх. Поднимите ревизию.</td></tr>
+<tr><td>OWF514: с живого сайта пропал <code>.nojekyll</code></td><td><code>actions/upload-pages-artifact</code> с четвёртой версии выбрасывает файлы с точкой. Тогда Pages прогоняет по фиду Jekyll и удаляет все пути, начинающиеся с точки или подчёркивания.</td><td>Поставьте <code>include-hidden-files: true</code>.</td></tr>
+<tr><td>Деплой Pages падает на правах</td><td><code>actions/deploy-pages</code> требует <code>actions: read</code>. Блок <code>permissions:</code> молча отбирает это право, если перечисляет только другие.</td><td>Выдайте <code>actions: read</code> в блоке <code>permissions:</code>.</td></tr>
+<tr><td><code>owfeed doctor</code> проходит, а <code>smoke</code> падает</td><td>Дерево согласовано, но роутер его не принимает. Обычно зависимость не разрешается на стоковом образе или файл установлен туда, куда никто не смотрит.</td><td>Смотрите вывод контейнера.</td></tr>
+<tr><td>Документированный URL установки отдаёт 404</td><td>README разошёлся с фидом.</td><td>Генерируйте инструкцию: <code>owfeed install-snippet</code>. <code>doctor</code> сверяет одно с другим.</td></tr>
+<tr><td>Сборка падает из-за устаревшего lock-файла</td><td>Апстрим добавил или убрал архитектуру.</td><td>Выполните <code>owfeed lock --update</code>. Прочитайте разницу, прежде чем коммитить.</td></tr>
 </table>
 
-<h2>Тестовые роутеры (owlab)</h2>
+<h2 id="owlab">Тестовые роутеры (owlab)</h2>
 
 <table>
-<tr><th>Что видно</th><th>Причина и что делать</th></tr>
-<tr><td>LuCI отвечает, но ничего не работает</td><td>procd сажает сервисы в jail, а контейнер jail построить не может. Для всего, чему нужно настоящее ядро или jail, берите <code>fidelity: vm</code>.</td></tr>
-<tr><td>Здоровая страница отдаёт 403</td><td>Неавторизованный запрос к <code>/cgi-bin/luci/admin</code> — это редирект на форму входа. <code>owlab test</code> сначала логинится, а написанный руками <code>curl</code> нет.</td></tr>
-<tr><td>Ответ 200, а в теле трейсбек</td><td>Диспетчер LuCI отдаёт 200, когда ловит исключение. <code>owlab test</code> считает это провалом, проверка кода ответа — нет.</td></tr>
-<tr><td><code>kmod-*</code> ставится, но не грузится</td><td>Контейнер работает на ядре хоста. Модулям ядра нужен <code>fidelity: vm</code>.</td></tr>
-<tr><td>Установки начали падать через день после того, как работали</td><td>Вы закрепились на <code>snapshot</code>. Образы и фиды snapshot пересобираются ежедневно и независимо. Указывайте точные номера релизов.</td></tr>
-<tr><td>Правки в <code>images/</code> ни на что не влияют</td><td>Контекст сборки зашит в бинарь. Пересоберите: <code>go build</code>.</td></tr>
-<tr><td>Сеть работает, а DNS нет</td><td>Движок контейнеров не пробрасывает исходящий UDP 53. <code>owlab doctor</code> это проверяет.</td></tr>
+<tr><th>Что видно</th><th>Причина</th><th>Что делать</th></tr>
+<tr><td>LuCI отвечает, но ничего не работает</td><td>procd сажает сервисы в jail, а контейнер jail построить не может.</td><td>Для всего, чему нужно настоящее ядро или jail, берите <code>fidelity: vm</code>.</td></tr>
+<tr><td>Здоровая страница отдаёт 403</td><td>Неавторизованный запрос к <code>/cgi-bin/luci/admin</code> — это редирект на форму входа. Написанный руками <code>curl</code> не логинится.</td><td>Проверяйте страницу через <code>owlab test</code>. Он сначала логинится.</td></tr>
+<tr><td>Ответ 200, а в теле трейсбек</td><td>Диспетчер LuCI отдаёт 200, когда ловит исключение. Проверка кода ответа это пропускает.</td><td>Проверяйте страницу через <code>owlab test</code>. Он считает это провалом.</td></tr>
+<tr><td><code>kmod-*</code> ставится, но не грузится</td><td>Контейнер работает на ядре хоста.</td><td>Берите <code>fidelity: vm</code>. Модулям ядра нужен именно он.</td></tr>
+<tr><td>Установки начали падать через день после того, как работали</td><td>Вы закрепились на <code>snapshot</code>. Образы и фиды snapshot пересобираются ежедневно и независимо.</td><td>Указывайте точные номера релизов.</td></tr>
+<tr><td>Правки в <code>images/</code> ни на что не влияют</td><td>Контекст сборки зашит в бинарь.</td><td>Пересоберите: <code>go build</code>.</td></tr>
+<tr><td>Сеть работает, а DNS нет</td><td>Движок контейнеров не пробрасывает исходящий UDP 53.</td><td>Запустите <code>owlab doctor</code>. Он это проверяет.</td></tr>
 </table>
 
 <h2>Куда смотреть дальше</h2>
 
 <ul>
-  <li><a href="https://github.com/owfeed/owlab/blob/main/docs/troubleshooting_ru.md">owlab: разбор проблем</a> — полный журнал по симптомам, с воспроизведением</li>
-  <li><a href="https://github.com/owfeed/owfeed-packages/blob/main/RUNBOOK_ru.md">owfeed-packages: runbook</a> — что и когда запускается в живом фиде и что делать, когда CI красный</li>
-  <li><a href="https://github.com/owfeed/owfeed/blob/main/docs/apk-behaviour.md">apk-behaviour.md</a> — что apk и opkg делают на самом деле, установлено запуском</li>
+  <li><a href="https://github.com/owfeed/owlab/blob/main/docs/troubleshooting_ru.md">owlab: разбор проблем</a>: полный журнал по симптомам, с воспроизведением</li>
+  <li><a href="https://github.com/owfeed/owfeed-packages/blob/main/RUNBOOK_ru.md">owfeed-packages: runbook</a>: что и когда запускается в живом фиде и что делать, когда CI красный</li>
+  <li><a href="https://github.com/owfeed/owfeed/blob/main/docs/apk-behaviour.md">apk-behaviour.md</a>: что apk и opkg делают на самом деле, установлено запуском</li>
 </ul>
 
 <footer>

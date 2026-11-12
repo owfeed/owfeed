@@ -1,26 +1,40 @@
 # What is built in owfeed, and what is not
 
-*[ECOSYSTEM.md](ECOSYSTEM.md) says where the boundaries between owlab, owfeed and
-owfeed-packages run and why. This file says how much of owfeed's side of that
-actually exists, as of 2026-07-28.*
+*How much of owfeed's side of the ecosystem exists, as of 2026-07-28. For anyone deciding whether
+to rely on a part of it. [ECOSYSTEM.md](ECOSYSTEM.md) says where the boundaries between owlab,
+owfeed and owfeed-packages run and why.*
 
-This file used to cover all three repositories, and it went stale twice — both
-times on a fact belonging to another repository, never on one of its own. Nothing
-in owfeed's CI touches owlab, so nothing here could notice when owlab shipped a
-feature this file called unimplemented. Each repository now keeps its own:
+- [Working, and verified](#working-and-verified-rather-than-assumed): ten paths, each checked by
+  running it.
+- [Built but not yet exercised](#built-but-not-yet-exercised-in-anger): three, waiting for a first
+  real use.
+- [Not built](#not-built-and-why): an author's in-package EC signature, and a consumer job inside
+  `feed.yml`.
+- [Known contradictions](#known-contradictions): one shared release key.
 
-- **owlab** — [`docs/STATUS.md`](https://github.com/owfeed/owlab/blob/main/docs/STATUS.md)
-- **owfeed-packages** — [`STATUS.md`](https://github.com/owfeed/owfeed-packages/blob/main/STATUS.md)
+The other repositories keep their own status files:
 
-The boundaries are meant to outlive any particular week. A status file is a
-snapshot and will go stale; keeping it beside the code that changes it is what
-makes going stale a diff somebody has to write rather than something that happens
-quietly.
+- **owlab**: [`docs/STATUS.md`](https://github.com/owfeed/owlab/blob/main/docs/STATUS.md)
+- **owfeed-packages**: [`STATUS.md`](https://github.com/owfeed/owfeed-packages/blob/main/STATUS.md)
+
+<details>
+<summary>Why each repository keeps its own status file</summary>
+
+This file used to cover all three repositories, and it went stale twice. Both times it was on a
+fact belonging to another repository, never on one of its own. Nothing in owfeed's CI touches
+owlab, so nothing here could notice when owlab shipped a feature this file called unimplemented.
+Each repository now keeps its own.
+
+The boundaries are meant to outlive any particular week. A status file is a snapshot and will go
+stale. Kept beside the code that changes it, going stale becomes a diff somebody has to write
+rather than something that happens quietly.
+
+</details>
 
 ## Working, and verified rather than assumed
 
-Everything here was checked by running it — against live routers, the published
-feed, or released binaries — not by reading the code.
+Everything here was checked by running it, not by reading the code: against live routers, the
+published feed, or released binaries.
 
 | | Evidence |
 |---|---|
@@ -37,43 +51,50 @@ feed, or released binaries — not by reading the code.
 
 ## Built but not yet exercised in anger
 
-- **`owfeed release --sign-also`** works and is wired into luci-theme-footstrap's
-  release job, but that job only runs on a tag and no tag has been cut since. The
-  first real proof arrives with the next theme release, where the verify step will
-  demand `install.sh.sig` and fail loudly if it is missing.
-- **The intake funnel** answers correctly when run by hand. No third party has used
-  it yet, so the first genuine request is still the first genuine test.
-- **`feed.yml`'s `published` and `page-url` outputs.** Both now have a value on
-  every publish; nothing reads them yet, which is the part still untested.
+| What | State | What is still unproven |
+|---|---|---|
+| `owfeed release --sign-also` | works, and is wired into luci-theme-footstrap's release job | That job only runs on a tag, and no tag has been cut since. The first real proof arrives with the next theme release. Its verify step will demand `install.sh.sig` and fail loudly if it is missing. |
+| The intake funnel | answers correctly when run by hand | No third party has used it yet, so the first genuine request is still the first genuine test. |
+| `feed.yml`'s `published` and `page-url` outputs | both now have a value on every publish | Nothing reads them yet, which is the part still untested. |
 
 ## Not built, and why
 
-**An in-package EC signature from a package author.** `owfeed sign` no longer needs
-a feed config, so the tooling is ready. Nobody uses it yet: it needs a new key and a
-new repository secret, which is the maintainer's call. Until then the claim in
-`CONTRIBUTING.md` that author signatures are additive — that a package carries both
-its author's and the feed's — is true of the design and demonstrated by nothing.
+### An in-package EC signature from a package author
 
-**A consumer job inside `feed.yml` itself.** The claim is now proved, but from the
-package side: luci-theme-footstrap installs the published theme by name and
-asserts its pages render. What that does not cover is a feed's own pull request —
-the tree being built there is not published yet, so proving it works means serving
-`out/` over HTTP from the runner and pointing owlab at it. `{host}` in a `--feed`
-URL exists for exactly that. Whether it belongs here as a `consumer-test:` input
-or in each feed's own workflow is a question about a public interface, and there
-is one consumer of it so far. Contracts belong to whoever has more than one.
+`owfeed sign` no longer needs a feed config, so the tooling is ready. Nobody uses it yet: it needs
+a new key and a new repository secret, which is the maintainer's call.
+
+Until then, the claim in owfeed-packages' [`CONTRIBUTING.md`](https://github.com/owfeed/owfeed-packages/blob/main/CONTRIBUTING.md#i-build-in-my-own-ci-and-want-my-package-in-this-feed) that an author's signature is not stripped is true of the design
+and demonstrated by nothing. That claim says the package a router installs carries its author's
+signature.
+
+### A consumer job inside `feed.yml` itself
+
+The claim is now proved, but from the package side: luci-theme-footstrap installs the published
+theme by name and asserts its pages render.
+
+That does not cover a feed's own pull request. The tree being built there is not published yet.
+Proving it works means serving `out/` over HTTP from the runner and pointing owlab at it. `{host}`
+in a `--feed` URL exists for exactly that.
+
+Open question: does it belong here as a `consumer-test:` input, or in each feed's own workflow? That
+is a question about a public interface, and there is one consumer of it so far. Contracts belong to
+whoever has more than one.
 
 ## Known contradictions
 
-One key, `vizzletf-release.pub`, covers two repositories while `keys/README.md` asks
-for one key per upstream repository. `owfeed` checks the manifest's `repo` line, so a
-manifest cannot be lifted between them and the shared key is tolerable — what
-separate keys would buy is blast radius, not correctness. The doctrine now says this
-out loud instead of being quietly contradicted by the table beneath it.
+One key, `vizzletf-release.pub`, covers two repositories, while `keys/README.md` asks for one key
+per upstream repository.
+
+- `owfeed` checks the manifest's `repo` line, so a manifest cannot be lifted between them. The
+  shared key is tolerable.
+- What separate keys would buy is blast radius, not correctness.
+- The doctrine now says this out loud instead of being quietly contradicted by the table beneath it.
 
 ## Where to look
 
-- [ECOSYSTEM.md](ECOSYSTEM.md) — the boundaries, the invariants, the contracts
-- [artifact-contract.md](artifact-contract.md) · [manifest-format.md](manifest-format.md) — the two formats that cross those boundaries
-- [the cookbook](https://owfeed.org/cookbook/) — the same path written for somebody
-  who has not read any of the above *([по-русски](https://owfeed.org/cookbook/ru/))*
+- [ECOSYSTEM.md](ECOSYSTEM.md): the boundaries, the invariants, the contracts.
+- [artifact-contract.md](artifact-contract.md) · [manifest-format.md](manifest-format.md): the two
+  formats that cross those boundaries.
+- [The cookbook](https://owfeed.org/cookbook/): the same path written for somebody who has not read
+  any of the above *([по-русски](https://owfeed.org/cookbook/ru/))*.

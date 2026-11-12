@@ -47,69 +47,82 @@
 
 <p class="kicker">Troubleshooting</p>
 <h1>When something breaks</h1>
-<p class="lead">Sorted by what you see. Start with <code>owfeed doctor</code> or
-<code>owlab doctor</code> — both print numbered findings that say what failed, the command that
-failed, and what to do.</p>
+<p class="lead">Fixes for feed and package problems, sorted by what you see. For router owners,
+package authors and feed maintainers.</p>
 
-<h2>Installing on a router</h2>
+<ul>
+  <li><strong>Start with a doctor:</strong> <code>owfeed doctor</code> or
+  <code>owlab doctor</code>.</li>
+  <li>Both print numbered findings: what failed, the command that failed, and what to do.</li>
+</ul>
+
+<p>Find it fast:</p>
+<ul>
+  <li><a href="#router">Installing on a router</a></li>
+  <li><a href="#build">Building and packaging</a></li>
+  <li><a href="#publish">Publishing a feed</a></li>
+  <li><a href="#owlab">Test routers (owlab)</a></li>
+</ul>
+
+<h2 id="router">Installing on a router</h2>
 
 <table>
-<tr><th>What you see</th><th>Cause and fix</th></tr>
-<tr><td><code>UNTRUSTED signature</code> after a firmware upgrade</td><td>The key is gone. <code>/etc/apk/keys/*.pem</code> does not survive sysupgrade on its own. Re-add the key, then list it and your repository file in <code>/lib/upgrade/keep.d/&lt;feed&gt;</code>, which sysupgrade reads alongside <code>/etc/sysupgrade.conf</code>.</td></tr>
-<tr><td>apk asks for <code>--allow-untrusted</code></td><td>The index is not signed by any key the router trusts. Check the key file is in <code>/etc/apk/keys/</code> and that you are pointing at the right feed. Do not pass the flag — it disables the check you installed the key for.</td></tr>
-<tr><td>Nothing downloads, HTTPS fails</td><td>A stock image cannot fetch over HTTPS. <code>apk add ca-bundle libustream-mbedtls</code> first.</td></tr>
-<tr><td>The feed URL 404s or returns nothing</td><td>apk does not follow redirects (<a href="https://github.com/openwrt/openwrt/issues/17180">openwrt#17180</a>). If the feed moved, put the final URL in the repository file. For apk the URL is the index <em>file</em>; for opkg it is the <em>directory</em>.</td></tr>
-<tr><td>Your package never upgrades</td><td>It was installed from a file. <code>apk add ./file.apk</code> pins the content hash in <code>/etc/apk/world</code>, and that survives sysupgrade. Remove the package, add the repository, install by name.</td></tr>
-<tr><td>Packages vanished after Attended Sysupgrade</td><td>Expected. <code>owut</code> forwards no custom repositories and the server's <code>repository_allow_list</code> is empty by default. Re-add the feed and reinstall.</td></tr>
-<tr><td><code>breaks: world[...]</code> on every install</td><td>The rootfs and the feed are different point releases. Pin both to the same exact release.</td></tr>
+<tr><th>What you see</th><th>Cause</th><th>Fix</th></tr>
+<tr><td><code>UNTRUSTED signature</code> after a firmware upgrade</td><td>The key is gone. <code>/etc/apk/keys/*.pem</code> does not survive sysupgrade on its own.</td><td>Re-add the key. Then list it and your repository file in <code>/lib/upgrade/keep.d/&lt;feed&gt;</code>, which sysupgrade reads alongside <code>/etc/sysupgrade.conf</code>.</td></tr>
+<tr><td>apk asks for <code>--allow-untrusted</code></td><td>The index is not signed by any key the router trusts.</td><td>Check the key file is in <code>/etc/apk/keys/</code> and that you are pointing at the right feed. Do not pass the flag: it disables the check you installed the key for.</td></tr>
+<tr><td>Nothing downloads, HTTPS fails</td><td>A stock image cannot fetch over HTTPS.</td><td>Run <code>apk add ca-bundle libustream-mbedtls</code> first.</td></tr>
+<tr><td>The feed URL 404s or returns nothing</td><td>apk does not follow redirects (<a href="https://github.com/openwrt/openwrt/issues/17180">openwrt#17180</a>).</td><td>If the feed moved, put the final URL in the repository file. For apk the URL is the index <em>file</em>; for opkg it is the <em>directory</em>.</td></tr>
+<tr><td>Your package never upgrades</td><td>It was installed from a file. <code>apk add ./file.apk</code> pins the content hash in <code>/etc/apk/world</code>, and that survives sysupgrade.</td><td>Remove the package, add the repository, install by name.</td></tr>
+<tr><td>Packages vanished after Attended Sysupgrade</td><td>Expected. <code>owut</code> forwards no custom repositories, and the server's <code>repository_allow_list</code> is empty by default.</td><td>Re-add the feed and reinstall.</td></tr>
+<tr><td><code>breaks: world[...]</code> on every install</td><td>The rootfs and the feed are different point releases.</td><td>Pin both to the same exact release.</td></tr>
 </table>
 
-<h2>Building and packaging</h2>
+<h2 id="build">Building and packaging</h2>
 
 <table>
-<tr><th>What you see</th><th>Cause and fix</th></tr>
-<tr><td>apk rejects the package as uninstallable</td><td><code>arch: all</code>. apk requires <code>noarch</code>. Use <code>LUCI_PKGARCH:=all</code> in a Makefile and let the build translate it, or write <code>arch: noarch</code> in <code>owfeed.yml</code>.</td></tr>
-<tr><td>The key is refused</td><td>A PKCS#8 PEM. <code>openssl genpkey -algorithm EC</code> writes the wrong shape; only SEC1 works. Generate with <code>owfeed keygen</code>.</td></tr>
-<tr><td>The version is rejected</td><td>After <code>~</code> apk reads a commit hash, so only hex digits are allowed. Write <code>1.0_beta1</code>, not <code>1.0~beta</code>. <code>-r&lt;n&gt;</code> goes last.</td></tr>
-<tr><td>The index does not match the packages</td><td>You indexed before signing. Signing appends bytes. Run <code>sign</code>, then <code>index</code>.</td></tr>
-<tr><td>Translations do not appear</td><td>LuCI reads compiled <code>.lmo</code> and ignores <code>.po</code>. Point <code>i18n.from:</code> at your catalogues and owfeed compiles them.</td></tr>
-<tr><td>A user's settings are replaced on every upgrade</td><td>The file is shipped but not in <code>conffiles:</code>. Declare every <code>/etc/config/*</code> the package installs.</td></tr>
-<tr><td>Works unminified, breaks after a real build</td><td><code>luci.mk</code> minifies JS and CSS; <code>owlab sync</code> does not. Run <code>owlab build</code> before releasing.</td></tr>
-<tr><td>A package is missing from one release line</td><td><code>owfeed doctor</code> reads the tree and cannot see what was never written. Compare the built tree against your config — that is what a feed's own tree check is for.</td></tr>
+<tr><th>What you see</th><th>Cause</th><th>Fix</th></tr>
+<tr><td>apk rejects the package as uninstallable</td><td><code>arch: all</code>. apk requires <code>noarch</code>.</td><td>Use <code>LUCI_PKGARCH:=all</code> in a Makefile and let the build translate it. Or write <code>arch: noarch</code> in <code>owfeed.yml</code>.</td></tr>
+<tr><td>The key is refused</td><td>A PKCS#8 PEM. <code>openssl genpkey -algorithm EC</code> writes the wrong shape; only SEC1 works.</td><td>Generate the key with <code>owfeed keygen</code>.</td></tr>
+<tr><td>The version is rejected</td><td>After <code>~</code> apk reads a commit hash, so only hex digits are allowed.</td><td>Write <code>1.0_beta1</code>, not <code>1.0~beta</code>. <code>-r&lt;n&gt;</code> goes last.</td></tr>
+<tr><td>The index does not match the packages</td><td>You indexed before signing. Signing appends bytes.</td><td>Run <code>sign</code>, then <code>index</code>.</td></tr>
+<tr><td>Translations do not appear</td><td>LuCI reads compiled <code>.lmo</code> and ignores <code>.po</code>.</td><td>Point <code>i18n.from:</code> at your catalogues. owfeed compiles them.</td></tr>
+<tr><td>A user's settings are replaced on every upgrade</td><td>The file is shipped but not in <code>conffiles:</code>.</td><td>Declare every <code>/etc/config/*</code> the package installs.</td></tr>
+<tr><td>Works unminified, breaks after a real build</td><td><code>luci.mk</code> minifies JS and CSS; <code>owlab sync</code> does not.</td><td>Run <code>owlab build</code> before releasing.</td></tr>
+<tr><td>A package is missing from one release line</td><td><code>owfeed doctor</code> reads the tree and cannot see what was never written.</td><td>Compare the built tree against your config. That is what a feed's own tree check is for.</td></tr>
 </table>
 
-<h2>Publishing a feed</h2>
+<h2 id="publish">Publishing a feed</h2>
 
 <table>
-<tr><th>What you see</th><th>Cause and fix</th></tr>
-<tr><td><code>$OWFEED_SIGN_KEY is empty</code></td><td>The secret is missing, or the job started before it existed. Note that a calling workflow cannot read an environment secret — signing secrets have to be repository or organization secrets.</td></tr>
-<tr><td>OWF513: a published version has different contents</td><td>A package changed without a version bump, or the build stopped being reproducible. Do not publish over it. Bump the revision.</td></tr>
-<tr><td>OWF514: the live site lost <code>.nojekyll</code></td><td><code>actions/upload-pages-artifact</code> drops dotfiles from v4. Set <code>include-hidden-files: true</code>, or Pages runs Jekyll over your feed and deletes every path starting with a dot or underscore.</td></tr>
-<tr><td>Pages deploy fails on permissions</td><td><code>actions/deploy-pages</code> needs <code>actions: read</code>, which a <code>permissions:</code> block silently withholds by naming other scopes.</td></tr>
-<tr><td><code>owfeed doctor</code> passes but <code>smoke</code> fails</td><td>The tree is coherent and a router still will not take it. Read the container output: usually a dependency that does not resolve on a stock image, or a file installed where nothing looks.</td></tr>
-<tr><td>A documented install URL 404s</td><td>Your README drifted from the feed. Generate it: <code>owfeed install-snippet</code>. <code>doctor</code> compares the two.</td></tr>
-<tr><td>The build fails on a stale lock</td><td>Upstream added or removed an architecture. Run <code>owfeed lock --update</code> and read the diff before committing it.</td></tr>
+<tr><th>What you see</th><th>Cause</th><th>Fix</th></tr>
+<tr><td><code>$OWFEED_SIGN_KEY is empty</code></td><td>The secret is missing, or the job started before it existed. A calling job cannot read an environment secret.</td><td>Store the keys as secrets of the <code>feed</code> environment: the publish job of <code>feed.yml</code> declares it and reads them directly. Keys at repository scope go in as the <code>sign-key</code> and <code>usign-key</code> secrets.</td></tr>
+<tr><td>OWF513: a published version has different contents</td><td>A package changed without a version bump, or the build stopped being reproducible.</td><td>Do not publish over it. Bump the revision.</td></tr>
+<tr><td>OWF514: the live site lost <code>.nojekyll</code></td><td><code>actions/upload-pages-artifact</code> drops dotfiles from v4. Then Pages runs Jekyll over your feed and deletes every path starting with a dot or underscore.</td><td>Set <code>include-hidden-files: true</code>.</td></tr>
+<tr><td>Pages deploy fails on permissions</td><td><code>actions/deploy-pages</code> needs <code>actions: read</code>. A <code>permissions:</code> block silently withholds it by naming other scopes.</td><td>Grant <code>actions: read</code> in the <code>permissions:</code> block.</td></tr>
+<tr><td><code>owfeed doctor</code> passes but <code>smoke</code> fails</td><td>The tree is coherent and a router still will not take it. Usually a dependency does not resolve on a stock image, or a file is installed where nothing looks.</td><td>Read the container output.</td></tr>
+<tr><td>A documented install URL 404s</td><td>Your README drifted from the feed.</td><td>Generate the instructions: <code>owfeed install-snippet</code>. <code>doctor</code> compares the two.</td></tr>
+<tr><td>The build fails on a stale lock</td><td>Upstream added or removed an architecture.</td><td>Run <code>owfeed lock --update</code>. Read the diff before you commit it.</td></tr>
 </table>
 
-<h2>Test routers (owlab)</h2>
+<h2 id="owlab">Test routers (owlab)</h2>
 
 <table>
-<tr><th>What you see</th><th>Cause and fix</th></tr>
-<tr><td>LuCI answers but nothing works</td><td>procd jails services and a container cannot build a jail. Use <code>fidelity: vm</code> for anything that needs a real kernel or a jailed service.</td></tr>
-<tr><td>A page returns 403 on a healthy router</td><td>An unauthenticated request to <code>/cgi-bin/luci/admin</code> is a redirect to the login form. <code>owlab test</code> logs in first; a hand-written <code>curl</code> does not.</td></tr>
-<tr><td>HTTP 200 with a traceback in the body</td><td>LuCI's dispatcher answers 200 when it catches an exception. <code>owlab test</code> fails this; a status-code check does not.</td></tr>
-<tr><td><code>kmod-*</code> installs but does not load</td><td>A container shares the host kernel. Kernel modules need <code>fidelity: vm</code>.</td></tr>
-<tr><td>Installs start failing a day after they worked</td><td>You pinned <code>snapshot</code>. Snapshot images and snapshot feeds are rebuilt daily and independently. Pin exact point releases.</td></tr>
-<tr><td>Editing files under <code>images/</code> changes nothing</td><td>The build context is embedded in the binary. Run <code>go build</code> again.</td></tr>
-<tr><td>DNS is broken but the network is fine</td><td>The container engine does not forward outbound UDP 53. <code>owlab doctor</code> checks this.</td></tr>
+<tr><th>What you see</th><th>Cause</th><th>Fix</th></tr>
+<tr><td>LuCI answers but nothing works</td><td>procd jails services, and a container cannot build a jail.</td><td>Use <code>fidelity: vm</code> for anything that needs a real kernel or a jailed service.</td></tr>
+<tr><td>A page returns 403 on a healthy router</td><td>An unauthenticated request to <code>/cgi-bin/luci/admin</code> is a redirect to the login form. A hand-written <code>curl</code> does not log in.</td><td>Check the page with <code>owlab test</code>. It logs in first.</td></tr>
+<tr><td>HTTP 200 with a traceback in the body</td><td>LuCI's dispatcher answers 200 when it catches an exception. A status-code check passes this.</td><td>Check the page with <code>owlab test</code>. It fails this case.</td></tr>
+<tr><td><code>kmod-*</code> installs but does not load</td><td>A container shares the host kernel.</td><td>Use <code>fidelity: vm</code>. Kernel modules need it.</td></tr>
+<tr><td>Installs start failing a day after they worked</td><td>You pinned <code>snapshot</code>. Snapshot images and snapshot feeds are rebuilt daily and independently.</td><td>Pin exact point releases.</td></tr>
+<tr><td>Editing files under <code>images/</code> changes nothing</td><td>The build context is embedded in the binary.</td><td>Run <code>go build</code> again.</td></tr>
+<tr><td>DNS is broken but the network is fine</td><td>The container engine does not forward outbound UDP 53.</td><td>Run <code>owlab doctor</code>. It checks this.</td></tr>
 </table>
 
 <h2>Where to look next</h2>
 
 <ul>
-  <li><a href="https://github.com/owfeed/owlab/blob/main/docs/troubleshooting.md">owlab troubleshooting</a> — the full log, sorted by symptom, with the reproductions</li>
-  <li><a href="https://github.com/owfeed/owfeed-packages/blob/main/RUNBOOK.md">owfeed-packages runbook</a> — what runs when in a live feed, and what to do when CI is red</li>
-  <li><a href="https://github.com/owfeed/owfeed/blob/main/docs/apk-behaviour.md">apk-behaviour.md</a> — what apk and opkg actually do, established by running them</li>
+  <li><a href="https://github.com/owfeed/owlab/blob/main/docs/troubleshooting.md">owlab troubleshooting</a>: the full log, sorted by symptom, with the reproductions</li>
+  <li><a href="https://github.com/owfeed/owfeed-packages/blob/main/RUNBOOK.md">owfeed-packages runbook</a>: what runs when in a live feed, and what to do when CI is red</li>
+  <li><a href="https://github.com/owfeed/owfeed/blob/main/docs/apk-behaviour.md">apk-behaviour.md</a>: what apk and opkg do, established by running them</li>
 </ul>
 
 <footer>
