@@ -72,7 +72,8 @@ dist/
 
 5. **Architecture directories hold nothing but `.apk` and `.ipk` files.** Readers ignore anything
    else, so anything else placed there is invisible and will be assumed absent. `manifest.txt`,
-   `manifest.txt.sig`, `notes.md` and an installer script belong at the root of `dist/`.
+   `manifest.txt.sig`, `notes.md` and an installer script belong at the root of `dist/`. The installer has no fixed name;
+   `owfeed release --sign-also <file>` signs it without adding it to the manifest.
 
 6. **Both formats belong in the same tree when both release lines are served.** 25.12 installs the
    `.apk`, 24.10 the `.ipk`. Producing only one abandons half the users, and nothing downstream can

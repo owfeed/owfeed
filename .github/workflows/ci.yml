@@ -26,6 +26,8 @@ jobs:
       # emit zstd, that a router accepts what was built -- so they run here rather
       # than being something only a maintainer remembers to do.
       - run: go test ./...
+        env:
+          OWFEED_INTEGRATION: "1"
 
       - name: gofmt
         run: |

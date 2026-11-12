@@ -70,7 +70,7 @@ package authors and feed maintainers.</p>
 <tr><th>What you see</th><th>Cause</th><th>Fix</th></tr>
 <tr><td><code>UNTRUSTED signature</code> after a firmware upgrade</td><td>The key is gone. <code>/etc/apk/keys/*.pem</code> does not survive sysupgrade on its own.</td><td>Re-add the key. Then list it and your repository file in <code>/lib/upgrade/keep.d/&lt;feed&gt;</code>, which sysupgrade reads alongside <code>/etc/sysupgrade.conf</code>.</td></tr>
 <tr><td>apk asks for <code>--allow-untrusted</code></td><td>The index is not signed by any key the router trusts.</td><td>Check the key file is in <code>/etc/apk/keys/</code> and that you are pointing at the right feed. Do not pass the flag: it disables the check you installed the key for.</td></tr>
-<tr><td>Nothing downloads, HTTPS fails</td><td>A stock image cannot fetch over HTTPS.</td><td>Run <code>apk add ca-bundle libustream-mbedtls</code> first.</td></tr>
+<tr><td>Nothing downloads, HTTPS fails</td><td>The image lacks the HTTPS packages. Stock 25.12 images have them; a custom build may not.</td><td>Run <code>apk add ca-bundle libustream-mbedtls</code> first.</td></tr>
 <tr><td>The feed URL 404s or returns nothing</td><td>apk does not follow redirects (<a href="https://github.com/openwrt/openwrt/issues/17180">openwrt#17180</a>).</td><td>If the feed moved, put the final URL in the repository file. For apk the URL is the index <em>file</em>; for opkg it is the <em>directory</em>.</td></tr>
 <tr><td>Your package never upgrades</td><td>It was installed from a file. <code>apk add ./file.apk</code> pins the content hash in <code>/etc/apk/world</code>, and that survives sysupgrade.</td><td>Remove the package, add the repository, install by name.</td></tr>
 <tr><td>Packages vanished after Attended Sysupgrade</td><td>Expected. <code>owut</code> forwards no custom repositories, and the server's <code>repository_allow_list</code> is empty by default.</td><td>Re-add the feed and reinstall.</td></tr>
@@ -88,7 +88,7 @@ package authors and feed maintainers.</p>
 <tr><td>Translations do not appear</td><td>LuCI reads compiled <code>.lmo</code> and ignores <code>.po</code>.</td><td>Point <code>i18n.from:</code> at your catalogues. owfeed compiles them.</td></tr>
 <tr><td>A user's settings are replaced on every upgrade</td><td>The file is shipped but not in <code>conffiles:</code>.</td><td>Declare every <code>/etc/config/*</code> the package installs.</td></tr>
 <tr><td>Works unminified, breaks after a real build</td><td><code>luci.mk</code> minifies JS and CSS; <code>owlab sync</code> does not.</td><td>Run <code>owlab build</code> before releasing.</td></tr>
-<tr><td>A package is missing from one release line</td><td><code>owfeed doctor</code> reads the tree and cannot see what was never written.</td><td>Compare the built tree against your config. That is what a feed's own tree check is for.</td></tr>
+<tr><td>A package is missing from one release line</td><td>A build step failed without stopping the run. <code>owfeed doctor</code> compares the tree against the config and reports each missing package as OWF406. A package left out for want of a pinned author signature is OWF407, a warning.</td><td>Check the build log for the step that failed, then rebuild and re-index. For OWF407, have the author sign the release with the pinned key, or drop the package from the config.</td></tr>
 </table>
 
 <h2 id="publish">Publishing a feed</h2>

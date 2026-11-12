@@ -3,6 +3,10 @@
 *This page explains the boundary between four repositories that share one lifecycle: what crosses it,
 and what each one promises never to do. It is for anyone changing one of them, or wiring them together in CI.*
 
+The title names the three tools. The fourth repository is
+[luci-theme-footstrap](https://github.com/VizzleTF/luci-theme-footstrap), the maintainer's own LuCI
+theme: a package that uses all three as intended.
+
 - **No code dependency.** The tools share no Go module and never will. They meet only at file formats
   and CLI surfaces.
 - **The boundary is whose key is in the environment.** owlab holds no keys. owfeed holds the author's key
@@ -61,6 +65,9 @@ documentation and reading order, and decides nothing about the boundary.
 - **Trust is the normative axis.** Invariants and CI gates are written against it. "There is no key in
   this job" is mechanically checkable; "this is the release stage" is not.
 - **Lifecycle is the teaching axis.** Documentation and reading order follow it.
+
+In the table, T0, T1 and T2 are the trust tiers: no keys, the author's key, the feed's key. L1 to L4
+are the lifecycle stages.
 
 |  | **T0 — no keys** | **T1 — author's key** | **T2 — feed's key** |
 |---|---|---|---|

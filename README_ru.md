@@ -77,7 +77,7 @@ chmod +x owfeed-linux-amd64 && sudo mv owfeed-linux-amd64 /usr/local/bin/owfeed
 | `build`, `sign`, `index`, `publish` | ничего; owfeed берёт apk-tools из OpenWrt SDK, проверяет запиненным ключом и пакетов им не компилирует |
 | `build` на macOS | Docker: apk-tools там не собирается |
 | `smoke` | Docker |
-| `smoke -arch` для чего угодно, кроме x86_64, на x86_64-хосте | QEMU: `docker run --privileged --rm tonistiigi/binfmt --install arm64` |
+| `smoke --arch` для чего угодно, кроме x86_64, на x86_64-хосте | QEMU: `docker run --privileged --rm tonistiigi/binfmt --install arm64` |
 
 ## Что вы хотите сделать?
 
@@ -216,7 +216,7 @@ jobs:
 ```
 
 1. Сохраните ключи как секреты environment `feed`: `OWFEED_SIGN_KEY`, и `OWFEED_USIGN_KEY`, если
-   обслуживаете 24.10. Ключ usign создаёт `owfeed keygen -usign`.
+   обслуживаете 24.10. Ключ usign создаёт `owfeed keygen --usign`.
 2. Добавьте job выше.
 3. Запушьте. Workflow собирает, прогоняет smoke на живом образе OpenWrt, гейтит через
    `owfeed publish` и заливает на GitHub Pages. Полный файл workflow — в
@@ -268,7 +268,7 @@ owfeed smoke
 - `doctor` доказывает, что дерево согласовано; `smoke` — что роутер его принимает.
 - По умолчанию — x86_64 и линия, отмеченная `default:` в `owfeed.yml`. `-release 24.10` проверяет
   opkg-линию.
-- `smoke -arch aarch64_cortex-a53` ставит на образ этой архитектуры. См. строку про QEMU в
+- `smoke --arch aarch64_cortex-a53` ставит на образ этой архитектуры. См. строку про QEMU в
   [Что нужно рядом](#что-нужно-рядом).
 
 <details>

@@ -13,9 +13,42 @@ gofmt -l .
 golangci-lint run ./...
 ```
 
-All three run in CI on every pull request. The tests include ones that pull real container images
-and a real apk toolchain. The failures worth catching here are the ones that only appear against
-the real thing.
+All three run in CI on every pull request.
+
+## What you need
+
+- **Go 1.26.9**, the version in `go.mod`. CI reads it from there.
+- **`bash` and `sh`** on `PATH`. A few tests run the workflow and setup scripts.
+- **For the integration tests only:** network access and Docker. They are the `*_integration_test.go`
+  files.
+
+## Unit tests and integration tests
+
+`go test ./...` alone runs the unit tests. It needs no Docker.
+
+The integration tests skip themselves unless you opt in, as CI does:
+
+```sh
+OWFEED_INTEGRATION=1 go test ./...
+```
+
+They pull real container images and a real apk toolchain: the failures worth catching are the ones
+that only appear against the real thing.
+
+- They download an OpenWrt SDK and router images, and talk to downloads.openwrt.org.
+- They need Docker. The apk tests need it only off linux/amd64.
+- `OWFEED_TEST_CACHE=<dir>` keeps the extracted toolchain between runs.
+- The usign interop test runs only when `OWFEED_USIGN` names a usign binary.
+
+## Pull request checklist
+
+- [ ] `go test ./...`, `gofmt -l .` and `golangci-lint run ./...` are clean.
+- [ ] A change users can see has an entry under `## Unreleased` in `CHANGELOG.md`. Add the heading if
+      it is not there. Documentation and tests need no entry.
+- [ ] A claim about what apk or opkg does is measured, with the command and the result, in
+      [docs/apk-behaviour.md](docs/apk-behaviour.md) (C-1).
+- [ ] A new check has the next free ID in its range and tests in both directions (C-5, C-7).
+- [ ] No key is committed (C-9).
 
 ## Find it fast
 
@@ -35,7 +68,7 @@ the real thing.
 
 ## Evidence, checks and errors
 
-**C-1. Every claim MUST be measured, not reasoned.** `docs/apk-behaviour.md` is the record: what
+**C-1. Every claim MUST be measured, not reasoned.** [`docs/apk-behaviour.md`](docs/apk-behaviour.md) is the record: what
 apk and opkg do, established by running them, with the command and the result. A change that
 asserts new behaviour belongs there with evidence beside it.
 
@@ -69,6 +102,13 @@ That reason cannot be recovered by reading the code.
 | 5xx | transport |
 | 6xx | on-device |
 | 7xx | documentation |
+
+The IDs are string literals beside each check, in `internal/doctor/*.go` and
+`internal/verify/verify.go`. To see the ones already taken:
+
+```sh
+grep -rhoE 'OWF[0-9]{3}' internal cmd --include='*.go' | sort -u
+```
 
 **C-6. Its doc comment MUST say what breaks in the field when it is not caught.**
 

@@ -6,7 +6,8 @@ writes it, `owfeed verify-artifact` and any feed ingesting that release read it.
 - Line-oriented, space-separated, parsed positionally. The first line is `owfeed-manifest 1`.
 - Each `pkg` line has seven tokens: `pkg`, then name, format, release asset name, size, sha256 and
   architecture.
-- Verify `manifest.txt.sig` against a pinned key before you parse anything.
+- Verify `manifest.txt.sig` against a pinned key before you parse anything. The signature is
+  [usign](https://github.com/openwrt/usign): OpenWrt's signify-style ed25519 signing tool.
 - Check `repo` and `tag`, then each file's size and hash.
 
 Without a manifest a consumer has to trust whatever the hosting service says a release holds. A
@@ -100,8 +101,8 @@ These are not suggestions; each one has a failure it exists to prevent.
 2. **Check the first line.** A manifest in a shape you do not know must be refused by name, not
    discovered field by field.
 
-   *Why:* a reader that skips this will accept a foreign six-field manifest and read an empty
-   seventh field. It then fails somewhere far away with an error about a missing directory.
+   *Why:* format 1 always writes seven tokens per `pkg` line. A reader that skips this will accept a
+   foreign six-field manifest and read an empty seventh field. It then fails somewhere far away with an error about a missing directory.
 
 3. **Check `repo` and `tag` against what you expected.**
 

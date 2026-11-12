@@ -5,12 +5,31 @@
 Six recipes for `owfeed.yml`, smallest first. They are for package authors who have files to ship and
 want a signed OpenWrt feed.
 
-- Each recipe is a directory you already have, a config, and four commands.
+- Each recipe is a directory you already have, a config, and five commands: `owfeed lock --update`,
+  then `build`, `sign`, `index` and `doctor`.
+- Every field the configs use is listed in the [owfeed.yml reference](https://owfeed.org/reference/#owfeed-yml)
+  and in [schema/v1.json](../schema/v1.json).
 - owfeed packages a directory. Your own build produces that directory.
 - If the shape of a feed is not yet clear, read [How it works](../README.md#how-it-works). It is twenty
   lines.
 - To run a recipe in GitHub Actions, with the keys kept as secrets, follow the
   [cookbook](https://owfeed.org/cookbook/).
+
+## Before the first recipe
+
+Three things every recipe relies on.
+
+- **`owfeed.lock`.** `owfeed lock --update` writes it beside `owfeed.yml`. It records what owfeed
+  derived: the point release, the architectures, the toolchain and the keyring version. Commit it at
+  first use. An upstream change then arrives as a diff in a pull request.
+- **The signing key.** `owfeed keygen -o ~/keys/myfeed.pem` writes the private key and its `.pub.pem`.
+  It refuses a path inside a git working tree. owfeed reads the key from `$OWFEED_SIGN_KEY` unless
+  `signing.key` names another `env:VAR` or `file:PATH`. A 24.10 feed also needs a usign key:
+  `owfeed keygen --usign`, read from the variable `signing.usign-key` names. For keys in CI, see
+  [CI in the README](../README.md#ci) and the [cookbook](https://owfeed.org/cookbook/).
+- **`publish: - target: github-pages`.** It is the only target this version implements. `owfeed publish`
+  runs the doctor checks on `out/` and refuses a tree that fails them. The upload itself is done by
+  the workflow, with `actions/upload-pages-artifact` and `actions/deploy-pages`.
 
 ## Find it fast
 

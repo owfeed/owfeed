@@ -75,7 +75,7 @@ Or build it with Go: `go install owfeed.org/owfeed/cmd/owfeed@latest`.
 | `build`, `sign`, `index`, `publish` | nothing; owfeed takes apk-tools out of the OpenWrt SDK, verified against a pinned key, and compiles no packages with it |
 | `build` on macOS | Docker, because apk-tools does not build there |
 | `smoke` | Docker |
-| `smoke -arch` other than x86_64, on an x86_64 host | QEMU: `docker run --privileged --rm tonistiigi/binfmt --install arm64` |
+| `smoke --arch` other than x86_64, on an x86_64 host | QEMU: `docker run --privileged --rm tonistiigi/binfmt --install arm64` |
 
 ## What do you want to do?
 
@@ -214,7 +214,7 @@ jobs:
 ```
 
 1. Store the keys as secrets of the `feed` environment: `OWFEED_SIGN_KEY`, and `OWFEED_USIGN_KEY` if
-   you serve 24.10. Make the usign key with `owfeed keygen -usign`.
+   you serve 24.10. Make the usign key with `owfeed keygen --usign`.
 2. Add the job above.
 3. Push. The workflow builds, smokes on a real OpenWrt image, gates on `owfeed publish`, and uploads
    to GitHub Pages. A complete workflow file is in the [cookbook](https://owfeed.org/cookbook/).
@@ -266,7 +266,7 @@ owfeed smoke
 - `doctor` proves the tree is coherent; `smoke` proves a router accepts it.
 - The default is x86_64 and the line `owfeed.yml` marks `default:`. `-release 24.10` smokes the opkg
   line.
-- `smoke -arch aarch64_cortex-a53` installs on an image of that architecture. See the QEMU line in
+- `smoke --arch aarch64_cortex-a53` installs on an image of that architecture. See the QEMU line in
   [What it needs](#what-it-needs).
 
 <details>

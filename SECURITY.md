@@ -11,8 +11,9 @@ verify a release binary. For feed maintainers and anyone auditing the tool.
 
 ## Reporting
 
-Open a [private advisory](https://github.com/owfeed/owfeed/security/advisories/new). Please do not
-open a public issue for anything that would let someone publish under a feed's key.
+Report every vulnerability through a
+[private advisory](https://github.com/owfeed/owfeed/security/advisories/new). Please do not open a
+public issue for one, least of all for anything that would let someone publish under a feed's key.
 
 ## What owfeed protects, and what it does not
 
@@ -71,6 +72,9 @@ a valid attestation for arbitrary bytes.
 </details>
 
 ## Verifying a download by hand
+
+Download the binary first: the `gh release download` command is in [Install](README.md#install). Then
+run:
 
 ```sh
 gh attestation verify owfeed-linux-amd64 -R owfeed/owfeed \
