@@ -73,6 +73,9 @@ type app struct {
 	// checkKeys is set only by `owfeed check`, and replaces whatever keys the config
 	// names with the throwaway pair that command generates. See check.go.
 	checkKeys *checkKeys
+	// throwawayKey is `owfeed index --throwaway-key`: a dry-run job that generated its
+	// own keys, outside `owfeed check`. See reconcileKeyring.
+	throwawayKey bool
 
 	out io.Writer
 	err io.Writer

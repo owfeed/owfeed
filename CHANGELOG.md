@@ -2,6 +2,23 @@
 
 Dates are when the tag was cut. Anything not listed is documentation or tests.
 
+## Unreleased
+
+- **Fixed:** the `dry-run` job of `feed.yml` passes once `owfeed.lock` records a keyring
+  identity (#44). It used to fail at `owfeed index` with exit 9 on every pull request
+  after the feed's first publish: the job signs with a key generated for the run, which
+  never matches the recorded one. The refusal advised `owfeed lock --update`, which
+  would record the throwaway key and break the next real publish. `owfeed check` no
+  longer gives that advice for its own throwaway key either.
+- **Added:** `owfeed index --throwaway-key`. It builds the keyring package for the key
+  in hand, under the recorded version, without comparing the key to `owfeed.lock`. The
+  dry-run job of `feed.yml` passes it; the publish job does not. `feed.yml` from this
+  release needs owfeed from this release or later: an older binary rejects the flag.
+- **Changed:** `owfeed publish` refuses a signing key that `owfeed.lock` does not record
+  for the keyring package, with exit 9. A real key indexed with `--throwaway-key` would
+  otherwise publish a rotation under the old keyring version, which routers decline as
+  an upgrade they already have.
+
 ## v0.5.8 — 2026-11-12
 
 - **Dependencies:** `github.com/klauspost/compress` v1.20.0 to v1.20.3 (#36).

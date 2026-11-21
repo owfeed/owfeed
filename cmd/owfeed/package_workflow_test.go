@@ -117,10 +117,10 @@ type workflowJob struct {
 	Steps []workflowStep
 }
 
-// packageJob returns package.yml's release job.
-func packageJob(t *testing.T) workflowJob {
+// workflowJobs returns the jobs of a workflow in .github/workflows.
+func workflowJobs(t *testing.T, file string) map[string]workflowJob {
 	t.Helper()
-	data, err := os.ReadFile("../../.github/workflows/package.yml")
+	data, err := os.ReadFile(filepath.Join("../../.github/workflows", file))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,9 +128,15 @@ func packageJob(t *testing.T) workflowJob {
 		Jobs map[string]workflowJob
 	}
 	if err := yaml.Unmarshal(data, &wf); err != nil {
-		t.Fatalf("package.yml: %v", err)
+		t.Fatalf("%s: %v", file, err)
 	}
-	return wf.Jobs["release"]
+	return wf.Jobs
+}
+
+// packageJob returns package.yml's release job.
+func packageJob(t *testing.T) workflowJob {
+	t.Helper()
+	return workflowJobs(t, "package.yml")["release"]
 }
 
 // packageSteps returns the steps of package.yml's release job.
