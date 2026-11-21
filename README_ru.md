@@ -57,7 +57,7 @@ owfeed превращает каталог в подписанный фид па
 Скачайте релизный бинарь и сверьте его с build-аттестацией GitHub:
 
 ```sh
-gh release download v0.5.8 -R owfeed/owfeed -p 'owfeed-linux-amd64'
+gh release download v0.5.9 -R owfeed/owfeed -p 'owfeed-linux-amd64'
 gh attestation verify owfeed-linux-amd64 -R owfeed/owfeed \
   --signer-workflow owfeed/owfeed/.github/workflows/release.yml
 chmod +x owfeed-linux-amd64 && sudo mv owfeed-linux-amd64 /usr/local/bin/owfeed
@@ -66,7 +66,7 @@ chmod +x owfeed-linux-amd64 && sudo mv owfeed-linux-amd64 /usr/local/bin/owfeed
 Или соберите через Go: `go install owfeed.org/owfeed/cmd/owfeed@latest`.
 
 - Сборки есть под linux и darwin, amd64 и arm64.
-- В GitHub Actions `owfeed/owfeed/setup@v0.5.8` ставит и проверяет бинарь за вас.
+- В GitHub Actions `owfeed/owfeed/setup@v0.5.9` ставит и проверяет бинарь за вас.
 - Проверяется аттестация. Контрольная сумма из того же релиза не годится: тот, кто подменил бинарь,
   подменил бы и её.
 
@@ -209,7 +209,7 @@ jobs:
       pages: write
       id-token: write
       actions: read
-    uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.8
+    uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.9
     secrets: inherit             # publish-job читает ключи из своего environment
     with:
       smoke-releases: "25.12 24.10"
@@ -233,7 +233,7 @@ jobs:
 <summary>Те же шаги вручную</summary>
 
 ```yaml
-- uses: owfeed/owfeed/setup@v0.5.8       # ставит owfeed v0.5.8
+- uses: owfeed/owfeed/setup@v0.5.9       # ставит owfeed v0.5.9
 - run: owfeed --frozen-lock build && owfeed sign && owfeed index
   env:
     OWFEED_SIGN_KEY: ${{ secrets.OWFEED_SIGN_KEY }}
