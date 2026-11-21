@@ -55,7 +55,7 @@ apk for 25.12 and later, opkg for 24.10 and earlier.
 Download a release binary and check it against GitHub's build attestation:
 
 ```sh
-gh release download v0.5.8 -R owfeed/owfeed -p 'owfeed-linux-amd64'
+gh release download v0.5.9 -R owfeed/owfeed -p 'owfeed-linux-amd64'
 gh attestation verify owfeed-linux-amd64 -R owfeed/owfeed \
   --signer-workflow owfeed/owfeed/.github/workflows/release.yml
 chmod +x owfeed-linux-amd64 && sudo mv owfeed-linux-amd64 /usr/local/bin/owfeed
@@ -64,7 +64,7 @@ chmod +x owfeed-linux-amd64 && sudo mv owfeed-linux-amd64 /usr/local/bin/owfeed
 Or build it with Go: `go install owfeed.org/owfeed/cmd/owfeed@latest`.
 
 - Builds exist for linux and darwin, amd64 and arm64.
-- In GitHub Actions, `owfeed/owfeed/setup@v0.5.8` installs and verifies it for you.
+- In GitHub Actions, `owfeed/owfeed/setup@v0.5.9` installs and verifies it for you.
 - The attestation is checked, not a checksum: whoever replaced the binary could replace a checksum
   from the same release too.
 
@@ -207,7 +207,7 @@ jobs:
       pages: write
       id-token: write
       actions: read
-    uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.8
+    uses: owfeed/owfeed/.github/workflows/feed.yml@v0.5.9
     secrets: inherit             # the publish job reads the keys from its environment
     with:
       smoke-releases: "25.12 24.10"
@@ -230,7 +230,7 @@ jobs:
 <summary>The same steps by hand</summary>
 
 ```yaml
-- uses: owfeed/owfeed/setup@v0.5.8       # installs owfeed v0.5.8
+- uses: owfeed/owfeed/setup@v0.5.9       # installs owfeed v0.5.9
 - run: owfeed --frozen-lock build && owfeed sign && owfeed index
   env:
     OWFEED_SIGN_KEY: ${{ secrets.OWFEED_SIGN_KEY }}

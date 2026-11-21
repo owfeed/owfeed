@@ -2,7 +2,7 @@
 
 Dates are when the tag was cut. Anything not listed is documentation or tests.
 
-## Unreleased
+## v0.5.9 — 2026-11-21
 
 - **Fixed:** the `dry-run` job of `feed.yml` passes once `owfeed.lock` records a keyring
   identity (#44). It used to fail at `owfeed index` with exit 9 on every pull request
@@ -18,6 +18,7 @@ Dates are when the tag was cut. Anything not listed is documentation or tests.
   for the keyring package, with exit 9. A real key indexed with `--throwaway-key` would
   otherwise publish a rotation under the old keyring version, which routers decline as
   an upgrade they already have.
+- **Dependencies:** `github.com/klauspost/compress` v1.20.3 to v1.20.4 (#43).
 
 ## v0.5.8 — 2026-11-12
 
