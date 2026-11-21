@@ -10,6 +10,7 @@ import (
 	"owfeed.org/owfeed/internal/config"
 	"owfeed.org/owfeed/internal/doctor"
 	"owfeed.org/owfeed/internal/index"
+	"owfeed.org/owfeed/internal/lock"
 )
 
 // publish gates a built tree on the checks that matter and then hands it to the
@@ -57,6 +58,9 @@ func (a *app) publish(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	if err := requireRecordedKey(c, l, in.Identity.String(), a.lockPath()); err != nil {
+		return err
+	}
 
 	// There is no flag to publish an unsigned or unchecked tree. Every existing
 	// feed's deploy step is an unconditional upload, and the failures that reach
@@ -97,6 +101,21 @@ func (a *app) publish(ctx context.Context, args []string) error {
 	a.logf("Deploying an artifact also keeps the feed's binaries out of git history, which is")
 	a.logf("how an existing feed repository reached 2.6 GB against a 1 GB Pages limit.")
 	return nil
+}
+
+// requireRecordedKey refuses a signing key the lockfile does not record for the
+// keyring package. `owfeed index` makes the same comparison, but
+// `index --throwaway-key` skips it, and a real key passed through that flag would
+// publish a rotation under the old keyring version, which every router declines as
+// an upgrade it already has. The gate is the one place no flag reaches.
+func requireRecordedKey(c *config.Config, l *lock.Lock, id, lockPath string) error {
+	if !*c.Signing.KeyringPackage || l.Keyring == nil || l.Keyring.Identity == id {
+		return nil
+	}
+	return fail(exitConflict,
+		"refusing to publish: the signing key is %s but %s records %s for the keyring package\n"+
+			"  run `owfeed lock --update` and commit the diff: a rotation is a fact worth seeing",
+		id, lockPath, l.Keyring.Identity)
 }
 
 // requireTreeFiles checks the things a publishable tree must carry that are not

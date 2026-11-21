@@ -262,10 +262,14 @@ jobs:
           } >> "$GITHUB_ENV"
           shred -u "$RUNNER_TEMP/k.pem" "$RUNNER_TEMP/k.sec"
 
+      # --throwaway-key: the key above was generated seconds ago, so it never matches
+      # the identity owfeed.lock records for the keyring package. Without the flag every
+      # pull request fails once the feed has published once. Never in the publish job,
+      # where that mismatch is an unrecorded rotation.
       - name: Sign and index
         run: |
           owfeed sign
-          owfeed index
+          owfeed index --throwaway-key
 
       - if: inputs.post-index != ''
         env:
