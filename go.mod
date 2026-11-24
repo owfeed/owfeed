@@ -2,7 +2,7 @@ module owfeed.org/owfeed
 
 go 1.26.9
 
-require github.com/klauspost/compress v1.20.4
+require github.com/klauspost/compress v1.20.5
 
 require gopkg.in/yaml.v3 v3.0.1
 
